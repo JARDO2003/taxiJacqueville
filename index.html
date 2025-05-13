@@ -1,9 +1,11 @@
+
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TAXI MOTO EXPRESS - Commandez votre taxi moto</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TAXI MOTO JACQUEVILLE - Commandez votre taxi moto</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <!-- Leaflet Routing Machine CSS -->
@@ -23,19 +25,24 @@
         
         body {
             background-color: #f5f5f5;
+            font-size: 16px;
         }
         
         .container {
+            width: 100%;
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 0 15px;
         }
         
         header {
             background-color: #ffcc00;
             color: #222;
-            padding: 15px 0;
+            padding: 12px 0;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
         
         .header-content {
@@ -45,15 +52,21 @@
         }
         
         .logo {
-            font-size: 24px;
+            font-size: 18px;
             font-weight: bold;
             display: flex;
             align-items: center;
         }
         
         .logo i {
-            margin-right: 10px;
-            font-size: 28px;
+            margin-right: 8px;
+            font-size: 20px;
+        }
+        
+        .hamburger {
+            display: none;
+            font-size: 24px;
+            cursor: pointer;
         }
         
         nav ul {
@@ -62,7 +75,7 @@
         }
         
         nav ul li {
-            margin-left: 20px;
+            margin-left: 15px;
         }
         
         nav ul li a {
@@ -70,6 +83,7 @@
             text-decoration: none;
             font-weight: 500;
             transition: color 0.3s;
+            font-size: 14px;
         }
         
         nav ul li a:hover {
@@ -78,76 +92,84 @@
         
         .hero {
             background-color: #ffcc00;
-            padding: 50px 0;
+            padding: 30px 0;
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
         
         .hero h1 {
-            font-size: 36px;
-            margin-bottom: 20px;
+            font-size: 24px;
+            margin-bottom: 15px;
             color: #222;
         }
         
         .hero p {
-            font-size: 18px;
-            margin-bottom: 30px;
+            font-size: 16px;
+            margin-bottom: 20px;
             color: #444;
         }
         
         .booking-form {
             background-color: white;
             border-radius: 10px;
-            padding: 30px;
+            padding: 20px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .booking-form h2 {
+            font-size: 20px;
+            margin-bottom: 15px;
         }
         
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         
         .form-group label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             font-weight: 500;
             color: #444;
+            font-size: 14px;
         }
         
         .form-group input {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
-            font-size: 16px;
+            font-size: 14px;
         }
         
         #map {
-            height: 400px;
+            height: 250px;
             width: 100%;
             border-radius: 5px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         
         .journey-details {
             background-color: #f9f9f9;
-            padding: 20px;
+            padding: 15px;
             border-radius: 5px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             display: none;
         }
         
         .journey-details h3 {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             color: #333;
+            font-size: 16px;
         }
         
         .detail-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 10px;
-            padding-bottom: 10px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
             border-bottom: 1px solid #eee;
+            font-size: 14px;
         }
         
         .detail-row:last-child {
@@ -168,7 +190,7 @@
             background-color: #ffcc00;
             color: #222;
             border: none;
-            padding: 12px 24px;
+            padding: 12px 20px;
             font-size: 16px;
             font-weight: 600;
             border-radius: 5px;
@@ -187,66 +209,69 @@
         
         .features {
             display: flex;
-            justify-content: space-between;
-            margin-bottom: 50px;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
         }
         
         .feature {
-            flex: 1;
             background-color: white;
-            padding: 25px;
+            padding: 20px;
             border-radius: 10px;
             text-align: center;
-            margin: 0 10px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.05);
         }
         
         .feature i {
-            font-size: 36px;
+            font-size: 30px;
             color: #ffcc00;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
         
         .feature h3 {
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             color: #333;
+            font-size: 18px;
         }
         
         .feature p {
             color: #666;
-            line-height: 1.6;
+            line-height: 1.4;
+            font-size: 14px;
         }
         
         footer {
             background-color: #222;
             color: white;
-            padding: 30px 0;
+            padding: 25px 0 15px;
             text-align: center;
         }
         
         .footer-content {
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+            gap: 20px;
             margin-bottom: 20px;
         }
         
         .footer-section {
-            flex: 1;
-            padding: 0 20px;
-            text-align: left;
+            text-align: center;
+            margin-bottom: 10px;
         }
         
         .footer-section h3 {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             color: #ffcc00;
+            font-size: 16px;
         }
         
         .footer-section p, .footer-section a {
             color: #ddd;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             display: block;
             text-decoration: none;
             transition: color 0.3s;
+            font-size: 14px;
         }
         
         .footer-section a:hover {
@@ -254,9 +279,10 @@
         }
         
         .copyright {
-            padding-top: 20px;
+            padding-top: 15px;
             border-top: 1px solid #444;
             color: #aaa;
+            font-size: 12px;
         }
         
         #confirmOrderBtn {
@@ -266,15 +292,15 @@
         #loadingIndicator {
             display: none;
             text-align: center;
-            margin: 20px 0;
+            margin: 15px 0;
         }
         
         .spinner {
             border: 4px solid rgba(255, 204, 0, 0.3);
             border-radius: 50%;
             border-top: 4px solid #ffcc00;
-            width: 30px;
-            height: 30px;
+            width: 25px;
+            height: 25px;
             animation: spin 1s linear infinite;
             margin: 0 auto;
         }
@@ -298,29 +324,32 @@
         
         .modal-content {
             background-color: white;
-            margin: 15% auto;
-            padding: 30px;
+            margin: 20% auto 0;
+            padding: 20px;
             border-radius: 10px;
-            width: 80%;
-            max-width: 500px;
+            width: 90%;
+            max-width: 400px;
             text-align: center;
         }
         
         .modal h2 {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             color: #333;
+            font-size: 20px;
         }
         
         .modal p {
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             color: #555;
-            line-height: 1.6;
+            line-height: 1.4;
+            font-size: 14px;
         }
         
         .btn-group {
             display: flex;
             justify-content: center;
-            gap: 15px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         
         .btn-secondary {
@@ -348,22 +377,24 @@
         
         .permission-content {
             background-color: white;
-            padding: 30px;
+            padding: 20px;
             border-radius: 10px;
             text-align: center;
-            max-width: 500px;
             width: 90%;
+            max-width: 350px;
         }
         
         .permission-content h2 {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             color: #333;
+            font-size: 20px;
         }
         
         .permission-content p {
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             color: #555;
-            line-height: 1.6;
+            line-height: 1.4;
+            font-size: 14px;
         }
         
         #locationSearchBtn {
@@ -371,112 +402,198 @@
         }
         
         .address-results {
-            max-height: 200px;
+            max-height: 150px;
             overflow-y: auto;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
             display: none;
         }
         
         .address-item {
-            padding: 10px;
+            padding: 8px;
             border-bottom: 1px solid #eee;
             cursor: pointer;
+            font-size: 13px;
         }
         
         .address-item:hover {
             background-color: #f5f5f5;
         }
         
-        @media (max-width: 768px) {
+        .other-services {
+            padding: 30px 0;
+            background-color: #f9f9f9;
+        }
+        
+        .section-title {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 22px;
+        }
+        
+        .services-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        .service-card {
+            width: 100%;
+            max-width: 350px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .service-image {
+            height: 180px;
+            background-size: cover;
+            background-position: center;
+            position: relative;
+        }
+        
+        .service-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+            padding: 20px 15px;
+            color: white;
+            text-align: center;
+        }
+        
+        .service-overlay h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+        
+        .service-overlay p {
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        
+        .service-btn {
+            display: inline-block;
+            padding: 8px 18px;
+            background-color: #ffcc00;
+            color: #222;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background-color 0.3s;
+            font-size: 14px;
+        }
+        
+        .service-btn:hover {
+            background-color: #f0c000;
+        }
+        
+        /* Styles responsive */
+        @media (min-width: 768px) {
+            .logo {
+                font-size: 24px;
+            }
+            
+            .logo i {
+                font-size: 28px;
+            }
+            
+            .hero h1 {
+                font-size: 36px;
+            }
+            
+            .hero p {
+                font-size: 18px;
+            }
+            
+            #map {
+                height: 400px;
+            }
+            
             .features {
-                flex-direction: column;
+                flex-direction: row;
+                justify-content: space-between;
             }
             
             .feature {
-                margin: 10px 0;
+                width: 32%;
             }
             
             .footer-content {
-                flex-direction: column;
+                flex-direction: row;
+                justify-content: space-between;
             }
             
             .footer-section {
-                margin-bottom: 20px;
+                text-align: left;
+                width: 30%;
+            }
+            
+            nav ul li a {
+                font-size: 16px;
+            }
+            
+            .modal-content {
+                margin: 15% auto 0;
             }
         }
-
-       
-    .other-services{
-        padding: 50px 0;
-        background-color: #f9f9f9;
-    }
-    
-    .section-title {
-        text-align: center;
-        margin-bottom: 30px;
-        color: #333;
-        font-size: 28px;
-    }
-    
-    .services-container {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 20px;
-    }
-    
-    .service-card {
-        width: 100%;
-        max-width: 400px;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    }
-    
-    .service-image {
-        height: 250px;
-        background-size: cover;
-        background-position: center;
-        position: relative;
-    }
-    
-    .service-overlay {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
-        padding: 30px 20px;
-        color: white;
-        text-align: center;
-    }
-    
-    .service-overlay h3 {
-        font-size: 24px;
-        margin-bottom: 10px;
-    }
-    
-    .service-overlay p {
-        margin-bottom: 15px;
-        font-size: 16px;
-    }
-    
-    .service-btn {
-        display: inline-block;
-        padding: 8px 20px;
-        background-color: #ffcc00;
-        color: #222;
-        border-radius: 5px;
-        text-decoration: none;
-        font-weight: 600;
-        transition: background-color 0.3s;
-    }
-    
-    .service-btn:hover {
-        background-color: #f0c000;
-    }
+        
+        @media (max-width: 767px) {
+            .hamburger {
+                display: block;
+            }
+            
+            nav {
+                position: fixed;
+                top: 50px;
+                left: -100%;
+                width: 80%;
+                height: 100vh;
+                background-color: #fff;
+                box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+                transition: left 0.3s ease;
+                z-index: 1000;
+            }
+            
+            nav.active {
+                left: 0;
+            }
+            
+            nav ul {
+                flex-direction: column;
+                padding: 20px;
+            }
+            
+            nav ul li {
+                margin: 0 0 15px 0;
+                width: 100%;
+            }
+            
+            nav ul li a {
+                display: block;
+                padding: 8px 0;
+                font-size: 16px;
+            }
+            
+            .overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0,0,0,0.5);
+                z-index: 999;
+            }
+            
+            .overlay.active {
+                display: block;
+            }
+        }
     </style>
 </head>
 <body>
@@ -485,21 +602,25 @@
             <h2>Autorisation de localisation</h2>
             <p>Pour utiliser notre service de taxi moto, nous avons besoin d'accéder à votre position actuelle.</p>
             <p>Cela nous permettra de vous proposer un itinéraire précis et d'envoyer un chauffeur à votre emplacement exact.</p>
-            <button class="btn" id="allowLocationBtn">Autoriser l'accès à ma position</button>
+            <button class="btn" id="allowLocationBtn">Autoriser l'accès</button>
         </div>
     </div>
+    
+    <div class="overlay" id="navOverlay"></div>
     
     <header>
         <div class="container header-content">
             <div class="logo">
                 <i class="fas fa-motorcycle"></i> TAXI MOTO JACQUEVILLE
             </div>
-            <nav>
+            <div class="hamburger" id="hamburger">
+                <i class="fas fa-bars"></i>
+            </div>
+            <nav id="mobileNav">
                 <ul>
                     <li><a href="#" class="active">Accueil</a></li>
                     <li><a href="apros.html">À propos</a></li>
-                     <li><a href="contact.html">Contact</a></li>
-
+                    <li><a href="contact.html">Contact</a></li>
                 </ul>
             </nav>
         </div>
@@ -585,24 +706,22 @@
         </div>
     </div>
 
-
     <section class="other-services">
-    <div class="container">
-        <h2 class="section-title">Autres services</h2>
-        <div class="services-container">
-            <div class="service-card">
-                <div class="service-image" style="background-image: url('/api/placeholder/400/200');">
-                    <div class="service-overlay">
-                        <h3>Eden Livraison</h3>
-                        <p>Service de livraison rapide et fiable</p>
-                       <a href="eden.html" class="btn service-btn">Accéder</a>
-
+        <div class="container">
+            <h2 class="section-title">Autres services</h2>
+            <div class="services-container">
+                <div class="service-card">
+                    <div class="service-image" style="background-image: url('/api/placeholder/400/200');">
+                        <div class="service-overlay">
+                            <h3>Eden Livraison</h3>
+                            <p>Service de livraison rapide et fiable</p>
+                            <a href="eden.html" class="service-btn">Accéder</a>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-</section>
+    </section>
     
     <footer>
         <div class="container">
@@ -619,14 +738,22 @@
                 </div>
                 <div class="footer-section">
                     <h3>Contact</h3>
-                    <p>Email: contact@taximotoexpress.com</p>
-                    <p>Téléphone: +224 XX XX XX XX</p>
+                    <p>Email: utilisateurmarcio@gmail.com</p>
+                    <p>Téléphone: +2250172369840</p>
                 </div>
             </div>
             <div class="copyright">
                 <p>&copy; 2025 TAXI MOTO EXPRESS - Tous droits réservés</p>
             </div>
         </div>
+    </footer>
+
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <!-- Leaflet Routing Machine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
+    <!-- OpenStreetMap Nominatim -->
+    
     </footer>
 
     <!-- Leaflet JS -->
