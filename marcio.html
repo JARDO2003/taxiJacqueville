@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDEN Livraison Express - Tableau de Bord</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --primary-color: #e91e63;
+            --secondary-color: #1a237e;
+            --white: #ffffff;
+            --light-gray: #f5f5f5;
+            --darker-gray: #ddd;
+            --success-color: #4CAF50;
+            --warning-color: #FF9800;
+            --info-color: #2196F3;
+            --danger-color: #f44336;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            background-color: var(--light-gray);
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--secondary-color), #283593);
+            color: var(--white);
+            text-align: center;
+            padding: 20px;
+            border-bottom: 4px solid var(--primary-color);
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        
+        .logo-container img {
+            height: 60px;
+            margin-right: 15px;
+        }
+        
+        .logo-text {
+            text-align: left;
+        }
+        
+        .logo-text h1 {
+            font-size: 1.8rem;
+            margin: 0;
+            color: var(--white);
+        }
+        
+        .logo-text p {
+            font-size: 1rem;
+            color: #ffeb3b;
+        }
+        
+        .main-container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 15px;
+        }
+        
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background-color: var(--white);
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .dashboard-title {
+            color: var(--secondary-color);
+            font-size: 1.5rem;
+        }
+        
+        .filter-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid var(--darker-gray);
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .orders-container {
+            background-color: var(--white);
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        
+        .orders-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .orders-table th,
+        .orders-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--light-gray);
+        }
+        
+        .orders-table th {
+            background-color: var(--secondary-color);
+            color: var(--white);
+            font-weight: bold;
+        }
+        
+        .orders-table tr:hover {
+            background-color: #f6f6f6;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: var(--white);
+        }
+        
+        .status-nouvelle {
+            background-color: var(--info-color);
+        }
+        
+        .status-en-cours {
+            background-color: var(--warning-color);
+        }
+        
+        .status-livree {
+            background-color: var(--success-color);
+        }
+        
+        .status-annulee {
+            background-color: var(--danger-color);
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: var(--white);
+            transition: background-color 0.3s;
+        }
+        
+        .btn-details {
+            background-color: var(--secondary-color);
+        }
+        
+        .btn-update {
+            background-color: var(--info-color);
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+        }
+        
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            overflow: auto;
+        }
+        
+        .modal-content {
+            background-color: var(--white);
+            margin: 10% auto;
+            padding: 25px;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+            animation: slideIn 0.4s ease;
+        }
+        
+        @keyframes slideIn {
+            from {transform: translateY(-50px); opacity: 0;}
+            to {transform: translateY(0); opacity: 1;}
+        }
+        
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #999;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        
+        .close-btn:hover {
+            color: #333;
+        }
+        
+        .detail-group {
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--light-gray);
+            padding-bottom: 15px;
+        }
+        
+        .detail-group:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: var(--secondary-color);
+        }
+        
+        .detail-value {
+            color: #444;
+        }
+        
+        .update-form {
+            margin-top: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--darker-gray);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        
+        .update-btn {
+            background-color: var(--primary-color);
+            color: var(--white);
+            border: none;
+            padding: 10px 20px;
+            font-size: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        .update-btn:hover {
+            background-color: #d81b60;
+        }
+        
+        .no-orders {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+            font-style: italic;
+        }
+        
+        .auth-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .auth-form {
+            background-color: var(--white);
+            padding: 30px;
+            border-radius: 5px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .auth-form h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--secondary-color);
+        }
+        
+        .auth-form input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid var(--darker-gray);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        
+        .auth-btn {
+            background-color: var(--primary-color);
+            color: var(--white);
+            border: none;
+            padding: 12px;
+            width: 100%;
+            font-size: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        
+        .auth-error {
+            color: var(--danger-color);
+            text-align: center;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        footer {
+            background-color: #222;
+            color: var(--white);
+            text-align: center;
+            padding: 15px;
+            margin-top: 30px;
+        }
+        
+        /* For mobile view */
+        @media screen and (max-width: 768px) {
+            .logo-container {
+                flex-direction: column;
+            }
+            
+            .logo-text {
+                text-align: center;
+                margin-top: 10px;
+            }
+            
+            .dashboard-header {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .orders-table {
+                display: block;
+                overflow-x: auto;
+            }
+            
+            .orders-table th,
+            .orders-table td {
+                min-width: 120px;
+            }
+            
+            .modal-content {
+                margin: 20% auto;
+                width: 95%;
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="image/mace.jpg" alt="Eden Livraison Logo">
+            <div class="logo-text">
+                <h1>EDEN Livraison Express</h1>
+                <p>Tableau de Bord</p>
+            </div>
+        </div>
+    </header>
+    
+    <div class="main-container">
+        <div class="dashboard-header">
+            <h2 class="dashboard-title">Gestion des Commandes</h2>
+            <div class="filter-container">
+                <select id="statusFilter" class="filter-select">
+                    <option value="all">Tous les statuts</option>
+                    <option value="nouvelle">Nouvelles</option>
+                    <option value="en-cours">En cours</option>
+                    <option value="livree">Livrées</option>
+                    <option value="annulee">Annulées</option>
+                </select>
+                <select id="typeFilter" class="filter-select">
+                    <option value="all">Tous les types</option>
+                    <option value="pli">Pli/Courrier</option>
+                    <option value="colis">Colis</option>
+                    <option value="repas">Repas</option>
+                    <option value="courses">Courses (Supermarché)</option>
+                    <option value="pharmacie">Courses (Pharmacie)</option>
+                    <option value="autre">Autre</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="orders-container">
+            <table class="orders-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Client</th>
+                        <th>Type</th>
+                        <th>Contact</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="ordersTableBody">
+                    <!-- Les commandes seront chargées dynamiquement ici -->
+                </tbody>
+            </table>
+            <div id="noOrders" class="no-orders" style="display: none;">
+                Aucune commande trouvée.
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal pour les détails de commande -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="closeDetailsBtn">&times;</span>
+            <h2>Détails de la Commande</h2>
+            <div id="orderDetails">
+                <!-- Les détails seront chargés dynamiquement ici -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal pour mettre à jour le statut -->
+    <div id="updateModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="closeUpdateBtn">&times;</span>
+            <h2>Mettre à jour le statut</h2>
+            <div id="updateOrderInfo">
+                <!-- Les infos de la commande seront chargées dynamiquement ici -->
+            </div>
+            <form id="updateForm" class="update-form">
+                <div class="form-group">
+                    <label for="statusUpdate">Nouveau statut:</label>
+                    <select id="statusUpdate" name="statusUpdate" required>
+                        <option value="nouvelle">Nouvelle</option>
+                        <option value="en-cours">En cours</option>
+                        <option value="livree">Livrée</option>
+                        <option value="annulee">Annulée</option>
+                    </select>
+                </div>
+                <button type="submit" class="update-btn">Mettre à jour</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Conteneur d'authentification -->
+    <div id="authContainer" class="auth-container">
+        <div class="auth-form">
+            <h2>Accès au Tableau de Bord</h2>
+            <input type="password" id="authPassword" placeholder="Mot de passe">
+            <button id="authButton" class="auth-btn">Se Connecter</button>
+            <p id="authError" class="auth-error">Mot de passe incorrect. Veuillez réessayer.</p>
+        </div>
+    </div>
+    
+    <footer>
+        <p>&copy; 2025 EDEN Livraison Express - Tous droits réservés</p>
+    </footer>
+    
+    <script>
+        // Configuration Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyAKnGEiUTHX6rQzIN-2zi_Ui4YJFv4U_PQ",
+            authDomain: "kolo-livraison.firebaseapp.com",
+            databaseURL: "https://kolo-livraison-default-rtdb.firebaseio.com",
+            projectId: "kolo-livraison",
+            storageBucket: "kolo-livraison.firebasestorage.app",
+            messagingSenderId: "78667636312",
+            appId: "1:78667636312:web:e8d3e05ad03858b6a2342d",
+            measurementId: "G-R79LC3XQL4"
+        };
+        
+        // Initialiser Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        
+        // Éléments du DOM
+        const ordersTableBody = document.getElementById("ordersTableBody");
+        const noOrdersMessage = document.getElementById("noOrders");
+        const detailsModal = document.getElementById("detailsModal");
+        const updateModal = document.getElementById("updateModal");
+        const orderDetails = document.getElementById("orderDetails");
+        const updateOrderInfo = document.getElementById("updateOrderInfo");
+        const closeDetailsBtn = document.getElementById("closeDetailsBtn");
+        const closeUpdateBtn = document.getElementById("closeUpdateBtn");
+        const updateForm = document.getElementById("updateForm");
+        const statusFilter = document.getElementById("statusFilter");
+        const typeFilter = document.getElementById("typeFilter");
+        const authContainer = document.getElementById("authContainer");
+        const authPassword = document.getElementById("authPassword");
+        const authButton = document.getElementById("authButton");
+        const authError = document.getElementById("authError");
+        
+        // Mot de passe pour accéder au tableau de bord (à modifier)
+        const DASHBOARD_PASSWORD = "eden2025";
+        
+        // Variables pour stocker les données
+        let allOrders = [];
+        let currentOrderId = null;
+        
+        // Authentification
+        authButton.addEventListener('click', function() {
+            if (authPassword.value === DASHBOARD_PASSWORD) {
+                authContainer.style.display = "none";
+                loadOrders();
+            } else {
+                authError.style.display = "block";
+                authPassword.value = "";
+            }
+        });
+        
+        // Permettre la soumission du formulaire d'authentification avec la touche Entrée
+        authPassword.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                authButton.click();
+            }
+        });
+        
+        // Charger les commandes depuis Firebase
+        function loadOrders() {
+            const commandesRef = database.ref('commandes');
+            
+            commandesRef.on('value', (snapshot) => {
+                ordersTableBody.innerHTML = "";
+                allOrders = [];
+                
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    
+                    for (const key in data) {
+                        if (data.hasOwnProperty(key)) {
+                            const order = data[key];
+                            order.id = key;
+                            allOrders.push(order);
+                        }
+                    }
+                    
+                    // Trier les commandes par date (les plus récentes d'abord)
+                    allOrders.sort((a, b) => new Date(b.dateCommande) - new Date(a.dateCommande));
+                    
+                    applyFilters();
+                } else {
+                    noOrdersMessage.style.display = "block";
+                }
+            });
+        }
+        
+        // Afficher les commandes dans le tableau
+        function displayOrders(orders) {
+            ordersTableBody.innerHTML = "";
+            
+            if (orders.length === 0) {
+                noOrdersMessage.style.display = "block";
+                return;
+            }
+            
+            noOrdersMessage.style.display = "none";
+            
+            orders.forEach(order => {
+                const row = document.createElement("tr");
+                
+                // Formater la date
+                const orderDate = new Date(order.dateCommande);
+                const formattedDate = `${orderDate.toLocaleDateString()} ${orderDate.toLocaleTimeString().slice(0, 5)}`;
+                
+                // Créer les cellules
+                row.innerHTML = `
+                    <td>${formattedDate}</td>
+                    <td>${order.nom} ${order.prenom}</td>
+                    <td>${getTypeLabel(order.typeColis)}</td>
+                    <td>${order.contact}</td>
+                    <td><span class="status-badge status-${order.status}">${getStatusLabel(order.status)}</span></td>
+                    <td class="action-buttons">
+                        <button class="btn btn-details" data-id="${order.id}">Détails</button>
+                        <button class="btn btn-update" data-id="${order.id}">Modifier</button>
+                    </td>
+                `;
+                
+                ordersTableBody.appendChild(row);
+            });
+            
+            // Ajouter les écouteurs d'événements aux boutons
+            addButtonListeners();
+        }
+        
+        // Ajouter les écouteurs d'événements aux boutons
+        function addButtonListeners() {
+            // Boutons pour voir les détails
+            const detailsButtons = document.querySelectorAll(".btn-details");
+            detailsButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const orderId = this.getAttribute("data-id");
+                    showOrderDetails(orderId);
+                });
+            });
+            
+            // Boutons pour mettre à jour le statut
+            const updateButtons = document.querySelectorAll(".btn-update");
+            updateButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const orderId = this.getAttribute("data-id");
+                    showUpdateModal(orderId);
+                });
+            });
+        }
+        
+        // Afficher les détails d'une commande
+        function showOrderDetails(orderId) {
+            const order = allOrders.find(o => o.id === orderId);
+            
+            if (order) {
+                const orderDate = new Date(order.dateCommande);
+                const formattedDate = `${orderDate.toLocaleDateString()} à ${orderDate.toLocaleTimeString()}`;
+                
+                orderDetails.innerHTML = `
+                    <div class="detail-group">
+                        <div class="detail-label">Date de commande:</div>
+                        <div class="detail-value">${formattedDate}</div>
+                    </div>
+                    <div class="detail-group">
+                        <div class="detail-label">Client:</div>
+                        <div class="detail-value">${order.nom} ${order.prenom}</div>
+                    </div>
+                    <div class="detail-group">
+                        <div class="detail-label">Type de colis:</div>
+                        <div class="detail-value">${getTypeLabel(order.typeColis)}</div>
+                    </div>
+                    <div class="detail-group">
+                        <div class="detail-label">Adresse de livraison:</div>
+                        <div class="detail-value">${order.adresse}</div>
+                    </div>
+                    <div class="detail-group">
+                        <div class="detail-label">Contact:</div>
+                        <div class="detail-value">${order.contact}</div>
+                    </div>
+                    <div class="detail-group">
+                        <div class="detail-label">Instructions spéciales:</div>
+                        <div class="detail-value">${order.instructions || "Aucune instruction"}</div>
+                    </div>
+                    <div class="detail-group">
+                        <div class="detail-label">Statut:</div>
+                        <div class="detail-value">
+                            <span class="status-badge status-${order.status}">${getStatusLabel(order.status)}</span>
+                        </div>
+                    </div>
+                `;
+                
+                detailsModal.style.display = "block";
+            }
+        }
+        
+        // Afficher le modal de mise à jour du statut
+        function showUpdateModal(orderId) {
+            const order = allOrders.find(o => o.id === orderId);
+            
+            if (order) {
+                currentOrderId = orderId;
+                
+                updateOrderInfo.innerHTML = `
+                    <div class="detail-group">
+                        <div class="detail-label">Client:</div>
+                        <div class="detail-value">${order.nom} ${order.prenom}</div>
+                    </div>
+                    <div class="detail-group">
+                        <div class="detail-label">Type:</div>
+                        <div class="detail-value">${getTypeLabel(order.typeColis)}</div>
+                    </div>
+                    <div class="detail-group">
+                        <div class="detail-label">Statut actuel:</div>
+                        <div class="detail-value">
+                            <span class="status-badge status-${order.status}">${getStatusLabel(order.status)}</span>
+                        </div>
+                    </div>
+                `;
+                
+                // Mettre à jour le statut par défaut dans le formulaire
+                document.getElementById("statusUpdate").value = order.status;
+                
+                updateModal.style.display = "block";
+            }
+        }
+        
+        // Mettre à jour le statut d'une commande
+        updateForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            if (currentOrderId) {
+                const newStatus = document.getElementById("statusUpdate").value;
+                
+                // Mettre à jour dans Firebase
+                database.ref(`commandes/${currentOrderId}`).update({
+                    status: newStatus
+                })
+                .then(() => {
+                    // Fermer le modal après la mise à jour
+                    updateModal.style.display = "none";
+                    currentOrderId = null;
+                })
+                .catch(error => {
+                    console.error("Erreur lors de la mise à jour du statut:", error);
+                    alert("Une erreur est survenue lors de la mise à jour du statut.");
+                });
+            }
+        });
+        
+        // Obtenir le libellé du type de colis
+        function getTypeLabel(type) {
+            const typeLabels = {
+                'pli': 'Pli/Courrier',
+                'colis': 'Colis',
+                'repas': 'Repas',
+                'courses': 'Courses (Supermarché)',
+                'pharmacie': 'Courses (Pharmacie)',
+                'autre': 'Autre'
+            };
+            
+            return typeLabels[type] || type;
+        }
+        
+        // Obtenir le libellé du statut
+        function getStatusLabel(status) {
+            const statusLabels = {
+                'nouvelle': 'Nouvelle',
+                'en-cours': 'En cours',
+                'livree': 'Livrée',
+                'annulee': 'Annulée'
+            };
+            
+            return statusLabels[status] || status;
+        }
+        
+        // Appliquer les filtres
+        function applyFilters() {
+            const statusValue = statusFilter.value;
+            const typeValue = typeFilter.value;
+            
+            let filteredOrders = [...allOrders];
+            
+            // Filtrer par statut si nécessaire
+            if (statusValue !== 'all') {
+                filteredOrders = filteredOrders.filter(order => order.status === statusValue);
+            }
+            
+            // Filtrer par type si nécessaire
+            if (typeValue !== 'all') {
+                filteredOrders = filteredOrders.filter(order => order.typeColis === typeValue);
+            }
+            
+            // Afficher les commandes filtrées
+            displayOrders(filteredOrders);
+        }
+        
+        // Écouteurs pour les filtres
+        statusFilter.addEventListener('change', applyFilters);
+        typeFilter.addEventListener('change', applyFilters);
+        
+        // Fermer les modals
+        closeDetailsBtn.onclick = function() {
+            detailsModal.style.display = "none";
+        }
+        
+        closeUpdateBtn.onclick = function() {
+            updateModal.style.display = "none";
+            currentOrderId = null;
+        }
+        
+        // Fermer les modals si on clique à l'extérieur
+        window.onclick = function(event) {
+            if (event.target == detailsModal) {
+                detailsModal.style.display = "none";
+            }
+            if (event.target == updateModal) {
+                updateModal.style.display = "none";
+                currentOrderId = null;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TAXI MOTO EXPRESS - Commandez votre taxi moto</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <!-- Leaflet Routing Machine CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.css" />
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        header {
+            background-color: #ffcc00;
+            color: #222;
+            padding: 15px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo i {
+            margin-right: 10px;
+            font-size: 28px;
+        }
+        
+        nav ul {
+            display: flex;
+            list-style: none;
+        }
+        
+        nav ul li {
+            margin-left: 20px;
+        }
+        
+        nav ul li a {
+            color: #222;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        
+        nav ul li a:hover {
+            color: #555;
+        }
+        
+        .hero {
+            background-color: #ffcc00;
+            padding: 50px 0;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .hero h1 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: #222;
+        }
+        
+        .hero p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #444;
+        }
+        
+        .booking-form {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #444;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .journey-details {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .journey-details h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-label {
+            font-weight: 500;
+            color: #555;
+        }
+        
+        .detail-value {
+            color: #333;
+            font-weight: bold;
+        }
+        
+        .btn {
+            background-color: #ffcc00;
+            color: #222;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: #f0c000;
+        }
+        
+        .btn-block {
+            display: block;
+            width: 100%;
+        }
+        
+        .features {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 50px;
+        }
+        
+        .feature {
+            flex: 1;
+            background-color: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 0 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        
+        .feature i {
+            font-size: 36px;
+            color: #ffcc00;
+            margin-bottom: 15px;
+        }
+        
+        .feature h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .feature p {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        footer {
+            background-color: #222;
+            color: white;
+            padding: 30px 0;
+            text-align: center;
+        }
+        
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        
+        .footer-section {
+            flex: 1;
+            padding: 0 20px;
+            text-align: left;
+        }
+        
+        .footer-section h3 {
+            margin-bottom: 15px;
+            color: #ffcc00;
+        }
+        
+        .footer-section p, .footer-section a {
+            color: #ddd;
+            margin-bottom: 10px;
+            display: block;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .footer-section a:hover {
+            color: #ffcc00;
+        }
+        
+        .copyright {
+            padding-top: 20px;
+            border-top: 1px solid #444;
+            color: #aaa;
+        }
+        
+        #confirmOrderBtn {
+            display: none;
+        }
+        
+        #loadingIndicator {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255, 204, 0, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #ffcc00;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            overflow: auto;
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        .modal h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .modal p {
+            margin-bottom: 25px;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        .btn-secondary {
+            background-color: #ddd;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #ccc;
+        }
+        
+        .location-permission {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .permission-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .permission-content h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .permission-content p {
+            margin-bottom: 25px;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        #locationSearchBtn {
+            margin-bottom: 15px;
+        }
+        
+        .address-results {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            display: none;
+        }
+        
+        .address-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        
+        .address-item:hover {
+            background-color: #f5f5f5;
+        }
+        
+        @media (max-width: 768px) {
+            .features {
+                flex-direction: column;
+            }
+            
+            .feature {
+                margin: 10px 0;
+            }
+            
+            .footer-content {
+                flex-direction: column;
+            }
+            
+            .footer-section {
+                margin-bottom: 20px;
+            }
+        }
+
+       
+    .other-services{
+        padding: 50px 0;
+        background-color: #f9f9f9;
+    }
+    
+    .section-title {
+        text-align: center;
+        margin-bottom: 30px;
+        color: #333;
+        font-size: 28px;
+    }
+    
+    .services-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 20px;
+    }
+    
+    .service-card {
+        width: 100%;
+        max-width: 400px;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    
+    .service-image {
+        height: 250px;
+        background-size: cover;
+        background-position: center;
+        position: relative;
+    }
+    
+    .service-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+        padding: 30px 20px;
+        color: white;
+        text-align: center;
+    }
+    
+    .service-overlay h3 {
+        font-size: 24px;
+        margin-bottom: 10px;
+    }
+    
+    .service-overlay p {
+        margin-bottom: 15px;
+        font-size: 16px;
+    }
+    
+    .service-btn {
+        display: inline-block;
+        padding: 8px 20px;
+        background-color: #ffcc00;
+        color: #222;
+        border-radius: 5px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: background-color 0.3s;
+    }
+    
+    .service-btn:hover {
+        background-color: #f0c000;
+    }
+    </style>
+</head>
+<body>
+    <div id="locationPermission" class="location-permission">
+        <div class="permission-content">
+            <h2>Autorisation de localisation</h2>
+            <p>Pour utiliser notre service de taxi moto, nous avons besoin d'accéder à votre position actuelle.</p>
+            <p>Cela nous permettra de vous proposer un itinéraire précis et d'envoyer un chauffeur à votre emplacement exact.</p>
+            <button class="btn" id="allowLocationBtn">Autoriser l'accès à ma position</button>
+        </div>
+    </div>
+    
+    <header>
+        <div class="container header-content">
+            <div class="logo">
+                <i class="fas fa-motorcycle"></i> TAXI MOTO EXPRESS
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="#" class="active">Accueil</a></li>
+                    <li><a href="#">Tarifs</a></li>
+                    <li><a href="#">À propos</a></li>
+                    <li><a href="#">Contact</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    
+    <section class="hero">
+        <div class="container">
+            <h1>Commandez votre taxi moto en quelques clics</h1>
+            <p>Rapide, fiable et économique - Nous vous conduisons à destination en toute sécurité</p>
+        </div>
+    </section>
+    
+    <main class="container">
+        <div class="booking-form">
+            <h2>Réservez votre course</h2>
+            <div class="form-group">
+                <label for="pickup">Point de départ</label>
+                <input type="text" id="pickup" placeholder="Entrez votre position actuelle">
+                <div id="pickupResults" class="address-results"></div>
+            </div>
+            
+            <div class="form-group">
+                <label for="destination">Destination</label>
+                <input type="text" id="destination" placeholder="Où souhaitez-vous aller ?">
+                <div id="destinationResults" class="address-results"></div>
+            </div>
+            
+            <div id="map"></div>
+            
+            <div id="loadingIndicator">
+                <div class="spinner"></div>
+                <p>Calcul de l'itinéraire en cours...</p>
+            </div>
+            
+            <div class="journey-details" id="journeyDetails">
+                <h3>Détails de la course</h3>
+                <div class="detail-row">
+                    <span class="detail-label">Distance:</span>
+                    <span class="detail-value" id="distance">-- km</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Durée estimée:</span>
+                    <span class="detail-value" id="duration">-- min</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Prix:</span>
+                    <span class="detail-value" id="price">-- FCFA</span>
+                </div>
+            </div>
+            
+            <button class="btn btn-block" id="searchRouteBtn">Rechercher l'itinéraire</button>
+            <button class="btn btn-block" id="confirmOrderBtn">Confirmer la commande</button>
+        </div>
+        
+        <div class="features">
+            <div class="feature">
+                <i class="fas fa-bolt"></i>
+                <h3>Rapide</h3>
+                <p>Évitez les embouteillages et arrivez à destination rapidement</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-money-bill-wave"></i>
+                <h3>Économique</h3>
+                <p>Tarifs compétitifs avec prix fixe en fonction de la distance</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-shield-alt"></i>
+                <h3>Sécurisé</h3>
+                <p>Chauffeurs professionnels et casques fournis pour votre sécurité</p>
+            </div>
+        </div>
+    </main>
+    
+    <div id="confirmationModal" class="modal">
+        <div class="modal-content">
+            <h2>Confirmer votre commande</h2>
+            <p>Vous êtes sur le point de commander un taxi moto pour un trajet de <span id="modalDistance">-- km</span> au prix de <span id="modalPrice">-- FCFA</span>.</p>
+            <p>Êtes-vous d'accord avec ce prix ?</p>
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="cancelOrderBtn">Annuler</button>
+                <button class="btn" id="finalConfirmBtn">Confirmer</button>
+            </div>
+        </div>
+    </div>
+
+
+    <section class="other-services">
+    <div class="container">
+        <h2 class="section-title">Autres services</h2>
+        <div class="services-container">
+            <div class="service-card">
+                <div class="service-image" style="background-image: url('/api/placeholder/400/200');">
+                    <div class="service-overlay">
+                        <h3>Eden Livraison</h3>
+                        <p>Service de livraison rapide et fiable</p>
+                        <a href="#" class="btn service-btn">Accéder</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+    
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>À propos de nous</h3>
+                    <p>TAXI MOTO EXPRESS est votre partenaire de confiance pour vos déplacements urbains rapides et économiques.</p>
+                </div>
+                <div class="footer-section">
+                    <h3>Liens utiles</h3>
+                    <a href="#">Conditions d'utilisation</a>
+                    <a href="#">Politique de confidentialité</a>
+                    <a href="#">FAQ</a>
+                </div>
+                <div class="footer-section">
+                    <h3>Contact</h3>
+                    <p>Email: contact@taximotoexpress.com</p>
+                    <p>Téléphone: +224 XX XX XX XX</p>
+                </div>
+            </div>
+            <div class="copyright">
+                <p>&copy; 2025 TAXI MOTO EXPRESS - Tous droits réservés</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <!-- Leaflet Routing Machine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
+    <!-- OpenStreetMap Nominatim -->
+    <script>
+        // Configuration Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBZOjPxnWZ7w9A5MdKulPSsuEcQMzj6u98",
+            authDomain: "transport-a8225.firebaseapp.com",
+            databaseURL: "https://transport-a8225-default-rtdb.firebaseio.com",
+            projectId: "transport-a8225",
+            storageBucket: "transport-a8225.firebasestorage.app",
+            messagingSenderId: "268859727706",
+            appId: "1:268859727706:web:3368b93a20826281799d63",
+            measurementId: "G-PE30CHJ409"
+        };
+        
+        // Initialiser Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        
+        // Variables globales
+        let map;
+        let routingControl;
+        let currentPosition;
+        let routeData = {
+            distance: 0,
+            duration: 0,
+            price: 0,
+            pickup: '',
+            destination: '',
+            pickupCoords: {},
+            destinationCoords: {}
+        };
+        
+        // Éléments du DOM
+        const locationPermission = document.getElementById('locationPermission');
+        const allowLocationBtn = document.getElementById('allowLocationBtn');
+        const pickupInput = document.getElementById('pickup');
+        const destinationInput = document.getElementById('destination');
+        const pickupResults = document.getElementById('pickupResults');
+        const destinationResults = document.getElementById('destinationResults');
+        const distanceElement = document.getElementById('distance');
+        const durationElement = document.getElementById('duration');
+        const priceElement = document.getElementById('price');
+        const journeyDetails = document.getElementById('journeyDetails');
+        const searchRouteBtn = document.getElementById('searchRouteBtn');
+        const confirmOrderBtn = document.getElementById('confirmOrderBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const confirmationModal = document.getElementById('confirmationModal');
+        const modalDistance = document.getElementById('modalDistance');
+        const modalPrice = document.getElementById('modalPrice');
+        const cancelOrderBtn = document.getElementById('cancelOrderBtn');
+        const finalConfirmBtn = document.getElementById('finalConfirmBtn');
+        
+        // Demander l'autorisation de localisation
+        allowLocationBtn.addEventListener('click', () => {
+            locationPermission.style.display = 'none';
+            initMap();
+        });
+        
+        // Initialiser la carte Leaflet
+        function initMap() {
+            // Coordonnées par défaut (centrer sur une ville africaine)
+            const defaultLocation = [9.5370, -13.6782]; // Conakry, Guinée
+            
+            // Créer la carte
+            map = L.map('map').setView(defaultLocation, 13);
+            
+            // Ajouter la couche de tuiles OpenStreetMap
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
+            
+            // Obtenir la position actuelle de l'utilisateur
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        currentPosition = [position.coords.latitude, position.coords.longitude];
+                        
+                        // Centrer la carte sur la position actuelle
+                        map.setView(currentPosition, 15);
+                        
+                        // Ajouter un marqueur pour la position actuelle
+                        L.marker(currentPosition, {
+                            icon: L.icon({
+                                iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+                                iconSize: [25, 41],
+                                iconAnchor: [12, 41],
+                                popupAnchor: [1, -34],
+                                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                                shadowSize: [41, 41]
+                            })
+                        }).addTo(map).bindPopup("Votre position actuelle").openPopup();
+                        
+                        // Obtenir l'adresse de la position actuelle
+                        reverseGeocode(currentPosition[0], currentPosition[1], (address) => {
+                            pickupInput.value = address;
+                            routeData.pickup = address;
+                            routeData.pickupCoords = {
+                                lat: currentPosition[0],
+                                lng: currentPosition[1]
+                            };
+                        });
+                    },
+                    (error) => {
+                        console.error('Erreur de géolocalisation:', error);
+                        // En cas d'erreur, utiliser la position par défaut
+                        map.setView(defaultLocation, 13);
+                    }
+                );
+            } else {
+                console.error('La géolocalisation n\'est pas prise en charge par ce navigateur.');
+                map.setView(defaultLocation, 13);
+            }
+            
+            // Configuration des recherches d'adresses
+            setupAddressSearch(pickupInput, pickupResults, (item) => {
+                routeData.pickup = item.display_name;
+                routeData.pickupCoords = {
+                    lat: parseFloat(item.lat),
+                    lng: parseFloat(item.lon)
+                };
+                pickupInput.value = item.display_name;
+                pickupResults.style.display = 'none';
+            });
+            
+            setupAddressSearch(destinationInput, destinationResults, (item) => {
+                routeData.destination = item.display_name;
+                routeData.destinationCoords = {
+                    lat: parseFloat(item.lat),
+                    lng: parseFloat(item.lon)
+                };
+                destinationInput.value = item.display_name;
+                destinationResults.style.display = 'none';
+            });
+        }
+        
+        // Configurer la recherche d'adresse
+        function setupAddressSearch(input, resultsContainer, onSelectCallback) {
+            input.addEventListener('input', debounce(function() {
+                if (input.value.length < 3) {
+                    resultsContainer.style.display = 'none';
+                    return;
+                }
+                
+                // Recherche d'adresse avec Nominatim
+                fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(input.value)}&format=json&limit=5`)
+                    .then(response => response.json())
+                    .then(data => {
+                        resultsContainer.innerHTML = '';
+                        
+                        if (data.length > 0) {
+                            data.forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'address-item';
+                                div.textContent = item.display_name;
+                                div.addEventListener('click', () => {
+                                    onSelectCallback(item);
+                                });
+                                resultsContainer.appendChild(div);
+                            });
+                            
+                            resultsContainer.style.display = 'block';
+                        } else {
+                            resultsContainer.style.display = 'none';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erreur lors de la recherche d\'adresse:', error);
+                    });
+            }, 300));
+        }
+        
+        // Fonction pour la recherche inverse d'adresse
+        function reverseGeocode(lat, lng, callback) {
+            fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.display_name) {
+                        callback(data.display_name);
+                    } else {
+                        callback(`${lat}, ${lng}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur lors de la recherche inverse d\'adresse:', error);
+                    callback(`${lat}, ${lng}`);
+                });
+        }
+        
+        // Fonction debounce pour limiter les appels API
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    timeout = null;
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+        
+        // Calculer l'itinéraire
+        function calculateRoute() {
+            // Vérifier si les champs sont remplis
+            if (!pickupInput.value || !destinationInput.value) {
+                alert('Veuillez entrer un point de départ et une destination');
+                return;
+            }
+            
+            // Vérifier si les coordonnées sont disponibles
+            if (!routeData.pickupCoords.lat || !routeData.destinationCoords.lat) {
+                alert('Impossible de trouver les coordonnées de départ ou de destination');
+                return;
+            }
+            
+            // Afficher l'indicateur de chargement
+            loadingIndicator.style.display = 'block';
+            
+            // Supprimer l'ancien itinéraire s'il existe
+            if (routingControl) {
+                map.removeControl(routingControl);
+            }
+            
+            // Créer les waypoints pour l'itinéraire
+            const waypoints = [
+                L.latLng(routeData.pickupCoords.lat, routeData.pickupCoords.lng),
+                L.latLng(routeData.destinationCoords.lat, routeData.destinationCoords.lng)
+            ];
+            
+            // Configurer le contrôle d'itinéraire
+            routingControl = L.Routing.control({
+                waypoints: waypoints,
+                lineOptions: {
+                    styles: [{ color: '#ffcc00', opacity: 0.7, weight: 5 }]
+                },
+                routeWhileDragging: false,
+                addWaypoints: false,
+                draggableWaypoints: false,
+                fitSelectedRoutes: true,
+                showAlternatives: false
+            }).addTo(map);
+            
+            // Écouter l'événement de routage réussi
+            routingControl.on('routesfound', function(e) {
+                // Masquer l'indicateur de chargement
+                loadingIndicator.style.display = 'none';
+                
+                // Récupérer les informations de l'itinéraire
+                const route = e.routes[0];
+                
+                // Calculer la distance en km et la durée en minutes
+                routeData.distance = route.summary.totalDistance / 1000; // Convertir en km
+                routeData.duration = Math.ceil(route.summary.totalTime / 60); // Convertir en minutes
+                routeData.price = Math.ceil(routeData.distance * 100); // 100 FCFA par km
+                
+                // Mettre à jour l'affichage
+                distanceElement.textContent = routeData.distance.toFixed(2) + ' km';
+                durationElement.textContent = routeData.duration + ' min';
+                priceElement.textContent = routeData.price + ' FCFA';
+                
+                // Afficher les détails de la course
+                journeyDetails.style.display = 'block';
+                
+                // Afficher le bouton de confirmation
+                searchRouteBtn.style.display = 'none';
+                confirmOrderBtn.style.display = 'block';
+            });
+            
+            // Gérer les erreurs de routage
+            routingControl.on('routingerror', function(e) {
+                loadingIndicator.style.display = 'none';
+                alert('Impossible de calculer l\'itinéraire. Veuillez vérifier vos points de départ et d\'arrivée.');
+            });
+        }
+        
+        // Ouvrir la modal de confirmation
+        function openConfirmationModal() {
+            modalDistance.textContent = routeData.distance.toFixed(2) + ' km';
+            modalPrice.textContent = routeData.price + ' FCFA';
+            confirmationModal.style.display = 'block';
+        }
+        
+        // Fermer la modal de confirmation
+        function closeConfirmationModal() {
+            confirmationModal.style.display = 'none';
+        }
+        
+        // Confirmer la commande
+        function confirmOrder() {
+            // Fermer la modal
+            closeConfirmationModal();
+            
+            // Créer un ID unique pour la commande
+            const orderId = Date.now().toString();
+            
+            // Préparer les données de la commande
+            const orderData = {
+                id: orderId,
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                status: 'new',
+                customer: {
+                    // Dans une version réelle, ces informations seraient collectées
+                    name: 'Client',
+                    phone: ''
+                },
+                route: {
+                    pickup: routeData.pickup,
+                    pickupCoords: routeData.pickupCoords,
+                    destination: routeData.destination,
+                    destinationCoords: routeData.destinationCoords,
+                    distance: routeData.distance,
+                    duration: routeData.duration,
+                    price: routeData.price
+                }
+            };
+            
+            // Enregistrer la commande dans Firebase
+            database.ref('orders/' + orderId).set(orderData)
+                .then(() => {
+                    // Rediriger vers une page de confirmation ou afficher un message
+                    showOrderConfirmation(orderId);
+                })
+                .catch((error) => {
+                    console.error('Erreur lors de l\'enregistrement de la commande:', error);
+                    alert('Une erreur est survenue lors de la confirmation de votre commande. Veuillez réessayer.');
+                });
+        }
+        
+        // Afficher la confirmation de commande
+        function showOrderConfirmation(orderId) {
+            // Créer une modal de confirmation dynamiquement
+            const confirmationDiv = document.createElement('div');
+            confirmationDiv.className = 'modal';
+            confirmationDiv.style.display = 'block';
+            
+            confirmationDiv.innerHTML = `
+                <div class="modal-content">
+                    <h2>Commande confirmée!</h2>
+                    <p>Votre commande a été enregistrée avec succès.</p>
+                    <p>Numéro de commande: <strong>${orderId}</strong></p>
+                    <p>Un chauffeur sera assigné à votre course dans les plus brefs délais.</p>
+                    <p>Vous pouvez suivre le statut de votre commande en temps réel.</p>
+                    <div class="btn-group">
+                        <button class="btn" id="closeConfirmationBtn">Fermer</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(confirmationDiv);
+            
+            // Configurer le bouton de fermeture
+            document.getElementById('closeConfirmationBtn').addEventListener('click', function() {
+                document.body.removeChild(confirmationDiv);
+                resetForm();
+            });
+            
+            // Démarrer le suivi de la commande
+            startOrderTracking(orderId);
+        }
+        
+        // Suivre le statut de la commande
+        function startOrderTracking(orderId) {
+            // Cette fonction pourrait mettre en place un écouteur 
+            // pour suivre les mises à jour de statut en temps réel
+            database.ref('orders/' + orderId).on('value', (snapshot) => {
+                const orderData = snapshot.val();
+                
+                if (orderData && orderData.status === 'assigned') {
+                    // Un chauffeur a été assigné
+                    showDriverAssigned(orderData.driver);
+                }
+            });
+        }
+        
+        // Afficher les informations du chauffeur assigné
+        function showDriverAssigned(driverInfo) {
+            // Créer une notification pour informer l'utilisateur
+            if (!driverInfo) return;
+            
+            const driverNotif = document.createElement('div');
+            driverNotif.className = 'modal';
+            driverNotif.style.display = 'block';
+            
+            driverNotif.innerHTML = `
+                <div class="modal-content">
+                    <h2>Chauffeur assigné!</h2>
+                    <p>Votre chauffeur est en route vers votre position.</p>
+                    <div class="driver-info">
+                        <p><strong>Nom:</strong> ${driverInfo.name || 'N/A'}</p>
+                        <p><strong>Véhicule:</strong> ${driverInfo.vehicleModel || 'Moto'}</p>
+                        <p><strong>Plaque:</strong> ${driverInfo.vehicleNumber || 'N/A'}</p>
+                        <p><strong>Temps d'arrivée estimé:</strong> ${driverInfo.eta || '5-10 minutes'}</p>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn" id="closeDriverNotifBtn">OK</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(driverNotif);
+            
+            // Configurer le bouton de fermeture
+            document.getElementById('closeDriverNotifBtn').addEventListener('click', function() {
+                document.body.removeChild(driverNotif);
+            });
+        }
+        
+        // Réinitialiser le formulaire
+        function resetForm() {
+            // Réinitialiser les champs
+            destinationInput.value = '';
+            routeData = {
+                distance: 0,
+                duration: 0,
+                price: 0,
+                pickup: routeData.pickup, // Garder le point de départ
+                destination: '',
+                pickupCoords: routeData.pickupCoords, // Garder les coordonnées de départ
+                destinationCoords: {}
+            };
+            
+            // Masquer les détails du trajet
+            journeyDetails.style.display = 'none';
+            
+            // Réinitialiser les boutons
+            confirmOrderBtn.style.display = 'none';
+            searchRouteBtn.style.display = 'block';
+            
+            // Supprimer l'itinéraire de la carte
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
+            }
+        }
+        
+        // Ajouter les écouteurs d'événements
+        searchRouteBtn.addEventListener('click', calculateRoute);
+        confirmOrderBtn.addEventListener('click', openConfirmationModal);
+        cancelOrderBtn.addEventListener('click', closeConfirmationModal);
+        finalConfirmBtn.addEventListener('click', confirmOrder);
+        
+        // Écouter les clics en dehors des résultats de recherche pour les masquer
+        document.addEventListener('click', function(event) {
+            if (!pickupResults.contains(event.target) && event.target !== pickupInput) {
+                pickupResults.style.display = 'none';
+            }
+            
+            if (!destinationResults.contains(event.target) && event.target !== destinationInput) {
+                destinationResults.style.display = 'none';
+            }
+        });
+        
+        // Initialiser la page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Afficher la demande de permission de localisation
+            locationPermission.style.display = 'flex';
+        });
+    </script>
+</body>
+</html>
