@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -904,6 +905,10 @@ let routingControl;
 let currentPosition;
 let currentOrderId = null;
 let userInfo = null;
+let watchPositionId = null;
+let locationMarker = null;
+let isGettingLocation = false;
+let defaultLocation = { lat: 5.3364, lng: -4.0266 }; // Position par défaut (Abidjan Centre)
 let routeData = {
     distance: 0,
     duration: 0,
@@ -915,10 +920,47 @@ let routeData = {
 };
 
 // Coordonnées pour centrer la carte sur la Côte d'Ivoire
-const ivoryCoastCenter = [7.539989, -5.547080]; // Latitude et longitude de la Côte d'Ivoire
+const ivoryCoastCenter = [7.54, -5.547]; // Centre de la Côte d'Ivoire
 const ivoryCoastBounds = [
     [4.193, -8.602], // Sud-Ouest
     [10.736, -2.493]  // Nord-Est
+];
+
+// Options de geocodage améliorées pour Nominatim
+const geocodeOptions = {
+    countryCodes: 'ci', // Code pays pour la Côte d'Ivoire
+    viewbox: '4.193,-8.602,10.736,-2.493', // viewbox approximatif de la Côte d'Ivoire
+    bounded: 1, // Recherche confinée au viewbox
+    addressdetails: 1,
+    'accept-language': 'fr'
+};
+
+// Base de données de lieux populaires en Côte d'Ivoire
+const popularPlaces = [
+    { name: "Abidjan Centre", lat: 5.3364, lng: -4.0266 },
+    { name: "Yamoussoukro", lat: 6.8276, lng: -5.2893 },
+    { name: "Bouaké", lat: 7.6908, lng: -5.0303 },
+    { name: "San-Pédro", lat: 4.7492, lng: -6.6367 },
+    { name: "Korhogo", lat: 9.4580, lng: -5.6296 },
+    { name: "Daloa", lat: 6.8772, lng: -6.4444 },
+    { name: "Man", lat: 7.4120, lng: -7.5469 },
+    { name: "Gagnoa", lat: 6.1328, lng: -5.9513 },
+    { name: "Abengourou", lat: 6.7309, lng: -3.4969 },
+    { name: "Grand-Bassam", lat: 5.2121, lng: -3.7501 },
+    { name: "Assinie", lat: 5.1453, lng: -3.2994 },
+    { name: "Jacqueville", lat: 5.2061, lng: -4.4227 },
+    { name: "Dabou", lat: 5.3259, lng: -4.3926 },
+    { name: "Bonoua", lat: 5.2747, lng: -3.5966 },
+    { name: "Bingerville", lat: 5.3526, lng: -3.8850 },
+    { name: "Plateau (Abidjan)", lat: 5.3232, lng: -4.0164 },
+    { name: "Cocody (Abidjan)", lat: 5.3601, lng: -3.9673 },
+    { name: "Marcory (Abidjan)", lat: 5.3010, lng: -3.9822 },
+    { name: "Treichville (Abidjan)", lat: 5.2918, lng: -4.0116 },
+    { name: "Port-Bouët (Abidjan)", lat: 5.2569, lng: -3.9295 },
+    { name: "Yopougon (Abidjan)", lat: 5.3248, lng: -4.0857 },
+    { name: "Adjamé (Abidjan)", lat: 5.3569, lng: -4.0259 },
+    { name: "Abobo (Abidjan)", lat: 5.4301, lng: -4.0446 },
+    { name: "Koumassi (Abidjan)", lat: 5.2901, lng: -3.9540 }
 ];
 
 // Éléments du DOM
@@ -929,7 +971,6 @@ const regPhone = document.getElementById('regPhone');
 const registerBtn = document.getElementById('registerBtn');
 const userNameDisplay = document.getElementById('userNameDisplay');
 const welcomeMessage = document.getElementById('welcomeMessage');
-// DOM elements (continued)
 const welcomeUserName = document.getElementById('welcomeUserName');
 const locationPermission = document.getElementById('locationPermission');
 const allowLocationBtn = document.getElementById('allowLocationBtn');
@@ -958,28 +999,58 @@ const driverPhone = document.getElementById('driverPhone');
 const driverPlate = document.getElementById('driverPlate');
 const acknowledgeDriverBtn = document.getElementById('acknowledgeDriverBtn');
 
+/**
+ * Gestion de l'utilisateur
+ */
+
 // Vérifier si l'utilisateur est déjà inscrit
 function checkUserRegistration() {
     const userId = localStorage.getItem('taxiMotoUserId');
     if (userId) {
+        // Afficher un indicateur de chargement discret si nécessaire
         database.ref('users/' + userId).once('value')
             .then((snapshot) => {
                 if (snapshot.exists()) {
                     userInfo = snapshot.val();
                     hideRegistrationModal();
                     displayUserInfo();
-                    showLocationPermission();
+                    // Initialiser la carte et commencer immédiatement la géolocalisation
+                    initMapAndLocation();
                 } else {
                     showRegistrationModal();
                 }
             })
-            .catch((error) => {
-                console.error("Erreur lors de la récupération des données utilisateur:", error);
-                showRegistrationModal();
+            .catch(() => {
+                // En cas d'erreur de connexion, on vérifie s'il y a des données en cache
+                const cachedUserInfo = localStorage.getItem('taxiMotoUserInfo');
+                if (cachedUserInfo) {
+                    try {
+                        userInfo = JSON.parse(cachedUserInfo);
+                        hideRegistrationModal();
+                        displayUserInfo();
+                        initMapAndLocation();
+                    } catch (e) {
+                        showRegistrationModal();
+                    }
+                } else {
+                    showRegistrationModal();
+                }
             });
     } else {
         showRegistrationModal();
     }
+}
+
+// Initialisation combinée de la carte et de la localisation
+function initMapAndLocation() {
+    // Initialiser la carte immédiatement
+    initMap();
+    
+    // Essayer d'obtenir la position actuelle immédiatement
+    // sans demander de permission préalable via modal
+    setTimeout(() => {
+        obtainCurrentPosition(true);
+    }, 500);
 }
 
 // Afficher le modal d'inscription
@@ -1013,9 +1084,12 @@ registerBtn.addEventListener('click', () => {
     }
     
     if (!validatePhoneNumber(phone)) {
-        alert('Veuillez entrer un numéro de téléphone valide');
+        alert('Veuillez entrer un numéro de téléphone valide (format: 07XXXXXXXX)');
         return;
     }
+    
+    registerBtn.disabled = true;
+    registerBtn.textContent = 'Inscription en cours...';
     
     // Créer un nouvel utilisateur
     const newUserRef = database.ref('users').push();
@@ -1028,26 +1102,34 @@ registerBtn.addEventListener('click', () => {
     
     newUserRef.set(userData)
         .then(() => {
-            localStorage.setItem('taxiMotoUserId', newUserRef.key);
+            const userId = newUserRef.key;
+            localStorage.setItem('taxiMotoUserId', userId);
+            // Stocker également en cache pour utilisation hors ligne
+            localStorage.setItem('taxiMotoUserInfo', JSON.stringify(userData));
             userInfo = userData;
             hideRegistrationModal();
             displayUserInfo();
-            showLocationPermission();
+            initMapAndLocation();
         })
-        .catch((error) => {
-            console.error("Erreur lors de l'inscription:", error);
+        .catch(() => {
+            registerBtn.disabled = false;
+            registerBtn.textContent = 'S\'inscrire';
             alert('Une erreur est survenue. Veuillez réessayer.');
         });
 });
 
 // Valider le format du numéro de téléphone (format ivoirien)
 function validatePhoneNumber(phone) {
-    // Format ivoirien: 01-99 XX XX XX XX (10 chiffres)
+    // Format ivoirien: 01-99 XX XX XX XX (10 chiffres commençant par 0)
     const regex = /^0[1-9][0-9]{8}$/;
     return regex.test(phone);
 }
 
-// Afficher le modal de permission de localisation
+/**
+ * Gestion de la localisation
+ */
+
+// Afficher le modal de permission de localisation (uniquement si nécessaire)
 function showLocationPermission() {
     locationPermission.style.display = 'flex';
 }
@@ -1055,311 +1137,940 @@ function showLocationPermission() {
 // Gérer l'autorisation de localisation
 allowLocationBtn.addEventListener('click', () => {
     locationPermission.style.display = 'none';
-    initMap();
+    obtainCurrentPosition(true);
 });
 
-// Initialiser la carte Leaflet
+// Initialiser la carte Leaflet avec centre sur la Côte d'Ivoire
 function initMap() {
-    // Créer la carte
-    map = L.map('map').setView(ivoryCoastCenter, 7);
-    map.setMaxBounds(ivoryCoastBounds);
+    try {
+        // Créer la carte centrée sur la Côte d'Ivoire
+        map = L.map('map', {
+            zoomControl: true,
+            maxBoundsViscosity: 1.0
+        }).setView(ivoryCoastCenter, 7); // Vue plus large pour montrer la Côte d'Ivoire
+        
+        // Éviter le zoom trop faible ou trop fort
+        map.setMinZoom(6);  // Zoom minimum pour voir toute la Côte d'Ivoire
+        map.setMaxZoom(18); // Zoom maximum pour les détails
+        map.setMaxBounds(L.latLngBounds(
+            L.latLng(3.0, -9.5),  // Sud-Ouest étendu
+            L.latLng(12.0, -1.5)  // Nord-Est étendu
+        ));
+        
+        // Ajouter la couche de carte OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // Ajouter une icône "Recentrer" sur la carte
+        const recenterControl = L.control({ position: 'bottomright' });
+        recenterControl.onAdd = function() {
+            const div = L.DomUtil.create('div', 'recenter-control');
+            div.innerHTML = '<button title="Recentrer sur ma position" style="padding: 8px; background: white; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"><i class="fas fa-location-arrow"></i></button>';
+            div.onclick = function() {
+                if (currentPosition) {
+                    map.setView([currentPosition.lat, currentPosition.lng], 15);
+                } else {
+                    // Si pas de position actuelle, essayer à nouveau
+                    obtainCurrentPosition(true);
+                }
+            };
+            return div;
+        };
+        recenterControl.addTo(map);
+        
+        // Ajouter un bouton pour zoomer sur toute la Côte d'Ivoire
+        const countryViewControl = L.control({ position: 'bottomright' });
+        countryViewControl.onAdd = function() {
+            const div = L.DomUtil.create('div', 'country-view-control');
+            div.innerHTML = '<button title="Voir toute la Côte d\'Ivoire" style="padding: 8px; background: white; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; margin-top: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"><i class="fas fa-globe-africa"></i></button>';
+            div.onclick = function() {
+                map.fitBounds(ivoryCoastBounds);
+            };
+            return div;
+        };
+        countryViewControl.addTo(map);
+        
+    } catch (error) {
+        console.error("Erreur d'initialisation de la carte:", error);
+        // Ne pas montrer d'erreur à l'utilisateur, mais plutôt initialiser une carte par défaut
+        setTimeout(() => {
+            try {
+                if (!map) {
+                    map = L.map('map').setView(defaultLocation, 13);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                }
+            } catch (e) {
+                console.warn("Échec de la création de la carte de secours:", e);
+            }
+        }, 1000);
+    }
+}
+
+// Obtenir la position actuelle avec système amélioré pour mobile
+function obtainCurrentPosition(recenter = false, silent = false) {
+    if (isGettingLocation) return;
+    isGettingLocation = true;
     
-    // Ajouter la couche de carte OpenStreetMap
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+    if (pickupInput && !silent) {
+        pickupInput.placeholder = "Recherche de votre position...";
+    }
     
-    // Obtenir la position actuelle
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                currentPosition = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                };
-                
-                // Centrer la carte sur la position actuelle
+    // Définir le timeout pour la géolocalisation
+    let positionTimeout = setTimeout(() => {
+        handlePositionError({
+            code: 3,
+            message: "Délai d'attente dépassé"
+        });
+    }, 8000);
+    
+    // Fonction de succès de localisation
+    function handlePositionSuccess(position) {
+        clearTimeout(positionTimeout);
+        isGettingLocation = false;
+        
+        if (watchPositionId) {
+            navigator.geolocation.clearWatch(watchPositionId);
+            watchPositionId = null;
+        }
+        
+        // Enregistrer la position actuelle
+        currentPosition = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy || 100
+        };
+        
+        // Vérifier si la position est en Côte d'Ivoire (avec une marge d'erreur)
+        const isInIvoryCoast = checkIfInIvoryCoast(currentPosition);
+        
+        if (!isInIvoryCoast) {
+            // Si hors de la Côte d'Ivoire, utiliser la position par défaut
+            console.warn("Position en dehors de la Côte d'Ivoire, utilisation de la position par défaut");
+            currentPosition = { ...defaultLocation };
+            
+            // Afficher un message seulement si le paramètre silent est false
+            if (!silent) {
+                showTemporaryMessage("Position détectée en dehors de la Côte d'Ivoire. Utilisation d'une position par défaut.", 3000);
+            }
+        }
+        
+        // Mise à jour du marqueur de position
+        if (map) {
+            updatePositionMarker();
+            
+            // Si demandé, centrer la carte sur la position
+            if (recenter) {
                 map.setView([currentPosition.lat, currentPosition.lng], 15);
-                
-                // Ajouter un marqueur pour la position actuelle
-                L.marker([currentPosition.lat, currentPosition.lng])
-                    .addTo(map)
-                    .bindPopup('Votre position actuelle')
-                    .openPopup();
-                
-                // Mettre à jour le champ de saisie du point de départ
-                reverseGeocode(currentPosition, (address) => {
+            }
+        }
+        
+        // Géocoder la position actuelle et définir le point de départ automatiquement
+        reverseGeocode(currentPosition, (address) => {
+            if (address) {
+                if (pickupInput) {
                     pickupInput.value = address;
                     routeData.pickup = address;
-                    routeData.pickupCoords = currentPosition;
-                });
-            },
-            (error) => {
-                console.error("Erreur de géolocalisation:", error);
-                alert('Impossible d\'obtenir votre position. Veuillez entrer votre point de départ manuellement.');
+                    routeData.pickupCoords = { ...currentPosition };
+                }
             }
-        );
-    } else {
-        alert('La géolocalisation n\'est pas prise en charge par votre navigateur.');
+        });
     }
-}
-
-// Fonction de géocodage inversé (coordonnées -> adresse)
-function reverseGeocode(coords, callback) {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}&zoom=18&addressdetails=1`;
     
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            const address = data.display_name;
-            callback(address);
-        })
-        .catch(error => {
-            console.error('Erreur lors du géocodage inversé:', error);
-            callback('Adresse non trouvée');
-        });
-}
-
-// Fonction de géocodage (adresse -> coordonnées)
-function geocode(address, callback) {
-    const encodedAddress = encodeURIComponent(address);
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=5`;
-    
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            callback(data);
-        })
-        .catch(error => {
-            console.error('Erreur lors du géocodage:', error);
-            callback([]);
-        });
-}
-
-// Gérer la recherche d'adresse pour le point de départ
-pickupInput.addEventListener('input', () => {
-    const query = pickupInput.value.trim();
-    
-    if (query.length > 2) {
-        geocode(query, (results) => {
-            displayAddressResults(results, pickupResults, (result) => {
-                pickupInput.value = result.display_name;
-                pickupResults.style.display = 'none';
+    // Fonction d'erreur de localisation
+    function handlePositionError(error) {
+        console.warn("Erreur de géolocalisation:", error.message);
+        clearTimeout(positionTimeout);
+        isGettingLocation = false;
+        
+        if (watchPositionId) {
+            navigator.geolocation.clearWatch(watchPositionId);
+            watchPositionId = null;
+        }
+        
+        // Utiliser le service d'IP-géolocalisation comme solution de secours
+        fetchLocationByIP()
+            .then(ipLocation => {
+                if (ipLocation && ipLocation.latitude && ipLocation.longitude) {
+                    // Vérifier si la position IP est en Côte d'Ivoire
+                    const ipPos = {
+                        lat: ipLocation.latitude,
+                        lng: ipLocation.longitude
+                    };
+                    
+                    if (checkIfInIvoryCoast(ipPos)) {
+                        currentPosition = ipPos;
+                        console.log("Position obtenue via IP:", currentPosition);
+                    } else {
+                        currentPosition = { ...defaultLocation };
+                        console.log("Position IP hors de Côte d'Ivoire, utilisation de la position par défaut");
+                    }
+                } else {
+                    currentPosition = { ...defaultLocation };
+                    console.log("Impossible d'obtenir la position par IP, utilisation de la position par défaut");
+                }
                 
-                routeData.pickup = result.display_name;
-                routeData.pickupCoords = {
-                    lat: parseFloat(result.lat),
-                    lng: parseFloat(result.lon)
-                };
+                if (map) {
+                    updatePositionMarker();
+                    if (recenter) {
+                        map.setView([currentPosition.lat, currentPosition.lng], 15);
+                    }
+                }
                 
-                if (routeData.destinationCoords && Object.keys(routeData.destinationCoords).length > 0) {
-                    calculateRoute();
+                // Géocoder la position
+                reverseGeocode(currentPosition, (address) => {
+                    if (pickupInput) {
+                        pickupInput.value = address || "Position actuelle";
+                        routeData.pickup = address || "Position actuelle";
+                        routeData.pickupCoords = { ...currentPosition };
+                    }
+                });
+                
+                if (!silent) {
+                    if (currentPosition.lat === defaultLocation.lat && currentPosition.lng === defaultLocation.lng) {
+                        showTemporaryMessage("Impossible d'accéder à votre position. Utilisation d'une position par défaut.", 3500);
+                    } else {
+                        showTemporaryMessage("Position approximative détectée.", 2000);
+                    }
+                }
+            })
+            .catch(e => {
+                console.warn("Erreur lors de la géolocalisation par IP:", e);
+                currentPosition = { ...defaultLocation };
+                
+                if (map) {
+                    updatePositionMarker();
+                    if (recenter) {
+                        map.setView([currentPosition.lat, currentPosition.lng], 15);
+                    }
+                }
+                
+                reverseGeocode(currentPosition, (address) => {
+                    if (pickupInput) {
+                        pickupInput.value = address || "Position par défaut";
+                        routeData.pickup = address || "Position par défaut";
+                        routeData.pickupCoords = { ...currentPosition };
+                    }
+                });
+                
+                if (!silent) {
+                    showTemporaryMessage("Impossible d'accéder à votre position. Utilisation d'une position par défaut.", 3500);
                 }
             });
-        });
-    } else {
-        pickupResults.style.display = 'none';
     }
-});
-
-// Gérer la recherche d'adresse pour la destination
-destinationInput.addEventListener('input', () => {
-    const query = destinationInput.value.trim();
     
-    if (query.length > 2) {
-        geocode(query, (results) => {
-            displayAddressResults(results, destinationResults, (result) => {
-                destinationInput.value = result.display_name;
-                destinationResults.style.display = 'none';
-                
-                routeData.destination = result.display_name;
-                routeData.destinationCoords = {
-                    lat: parseFloat(result.lat),
-                    lng: parseFloat(result.lon)
-                };
-                
-                if (routeData.pickupCoords && Object.keys(routeData.pickupCoords).length > 0) {
-                    calculateRoute();
+    // Vérifier si la géolocalisation est disponible
+    if ('geolocation' in navigator) {
+        try {
+            // Régler les options de géolocalisation pour mobile
+            const geoOptions = {
+                enableHighAccuracy: true,
+                timeout: 7000,
+                maximumAge: 0
+            };
+            
+            // Demander la permission et obtenir la position
+            navigator.geolocation.getCurrentPosition(
+                handlePositionSuccess,
+                handlePositionError,
+                geoOptions
+            );
+        } catch (e) {
+            console.error("Exception lors de la demande de géolocalisation:", e);
+            handlePositionError({
+                code: 0,
+                message: "Exception: " + e.message
+            });
+        }
+    } else {
+        console.warn("La géolocalisation n'est pas prise en charge par ce navigateur");
+        handlePositionError({
+            code: 0,
+            message: "Géolocalisation non supportée"
+        });
+    }
+}
+
+// Vérifier si les coordonnées sont dans les limites de la Côte d'Ivoire
+function checkIfInIvoryCoast(position) {
+    // Ajouter une petite marge pour tenir compte des erreurs de géolocalisation
+    const bounds = {
+        minLat: ivoryCoastBounds[0][0] - 0.5, // 0.5 degrés de marge
+        maxLat: ivoryCoastBounds[1][0] + 0.5,
+        minLng: ivoryCoastBounds[0][1] - 0.5,
+        maxLng: ivoryCoastBounds[1][1] + 0.5
+    };
+    
+    return position.lat >= bounds.minLat && position.lat <= bounds.maxLat &&
+           position.lng >= bounds.minLng && position.lng <= bounds.maxLng;
+}
+
+// Obtenir la position par adresse IP (fallback si la géolocalisation échoue)
+function fetchLocationByIP() {
+    return new Promise((resolve, reject) => {
+        // Utiliser un service de géolocalisation par IP
+        fetch('https://ipapi.co/json/')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
                 }
+                return response.json();
+            })
+            .then(data => {
+                resolve(data);
+            })
+            .catch(error => {
+                console.warn("Erreur lors de la géolocalisation par IP:", error);
+                
+                // Essayer un autre service comme fallback
+                fetch('https://ipinfo.io/json')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Erreur HTTP: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Convertir "lat,lng" en objet
+                        if (data.loc) {
+                            const [latitude, longitude] = data.loc.split(',').map(parseFloat);
+                            resolve({
+                                latitude,
+                                longitude,
+                                country: data.country
+                            });
+                        } else {
+                            reject(new Error("Données de géolocalisation incomplètes"));
+                        }
+                    })
+                    .catch(err => {
+                        reject(err);
+                    });
             });
-        });
-    } else {
-        destinationResults.style.display = 'none';
-    }
-});
+    });
+}
 
-// Afficher les résultats de recherche d'adresses
-function displayAddressResults(results, container, onSelectCallback) {
-    container.innerHTML = '';
+// Mettre à jour le marqueur de position sur la carte
+function updatePositionMarker() {
+    if (!map || !currentPosition) return;
     
-    if (results.length > 0) {
-        results.forEach((result) => {
-            const item = document.createElement('div');
-            item.className = 'address-item';
-            item.textContent = result.display_name;
-            
-            item.addEventListener('click', () => {
-                onSelectCallback(result);
-            });
-            
-            container.appendChild(item);
+    // Si un marqueur existe déjà, le mettre à jour
+    if (locationMarker) {
+        locationMarker.setLatLng([currentPosition.lat, currentPosition.lng]);
+        if (locationMarker.accuracyCircle) {
+            locationMarker.accuracyCircle.setLatLng([currentPosition.lat, currentPosition.lng]);
+            locationMarker.accuracyCircle.setRadius(currentPosition.accuracy || 100);
+        }
+    } else {
+        // Sinon créer un nouveau marqueur avec une icône personnalisée
+        const locationIcon = L.divIcon({
+            html: '<div style="background-color: #4285F4; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 3px rgba(0,0,0,0.4);"></div>',
+            className: 'location-marker-icon',
+            iconSize: [22, 22],
+            iconAnchor: [11, 11]
         });
         
-        container.style.display = 'block';
-    } else {
-        container.style.display = 'none';
+        locationMarker = L.marker([currentPosition.lat, currentPosition.lng], {
+            icon: locationIcon,
+            zIndexOffset: 1000
+        }).addTo(map);
+        
+        // Créer un cercle de précision autour du marqueur
+        const accuracyCircle = L.circle([currentPosition.lat, currentPosition.lng], {
+            radius: currentPosition.accuracy || 100,
+            fillColor: '#4285F4',
+            fillOpacity: 0.15,
+            stroke: false
+        }).addTo(map);
+        
+        // Associer le cercle au marqueur pour les mises à jour
+        locationMarker.accuracyCircle = accuracyCircle;
     }
 }
 
-// Rechercher l'itinéraire
-searchRouteBtn.addEventListener('click', () => {
-    const pickup = pickupInput.value.trim();
-    const destination = destinationInput.value.trim();
-    
-    if (!pickup || !destination) {
-        alert('Veuillez entrer un point de départ et une destination');
+// Fonction de géocodage inversé améliorée (coordonnées -> adresse) avec système multi-sources
+function reverseGeocode(coords, callback) {
+    if (!coords || !coords.lat || !coords.lng) {
+        callback(null);
         return;
     }
     
-    if (!routeData.pickupCoords || !routeData.destinationCoords) {
-        loadingIndicator.style.display = 'block';
-        
-        if (!routeData.pickupCoords) {
-            geocode(pickup, (results) => {
-                if (results.length > 0) {
-                    routeData.pickup = results[0].display_name;
-                    routeData.pickupCoords = {
-                        lat: parseFloat(results[0].lat),
-                        lng: parseFloat(results[0].lon)
-                    };
-                    
-                    if (routeData.destinationCoords) {
-                        calculateRoute();
-                    }
-                } else {
-                    loadingIndicator.style.display = 'none';
-                    alert('Point de départ non trouvé');
-                }
-            });
-        }
-        
-        if (!routeData.destinationCoords) {
-            geocode(destination, (results) => {
-                if (results.length > 0) {
-                    routeData.destination = results[0].display_name;
-                    routeData.destinationCoords = {
-                        lat: parseFloat(results[0].lat),
-                        lng: parseFloat(results[0].lon)
-                    };
-                    
-                    if (routeData.pickupCoords) {
-                        calculateRoute();
-                    }
-                } else {
-                    loadingIndicator.style.display = 'none';
-                    alert('Destination non trouvée');
-                }
-            });
-        }
-    } else {
-        calculateRoute();
+    // Vérifier d'abord si c'est un lieu populaire
+    const popularPlace = findNearestPopularPlace(coords, 0.5); // 0.5 km de rayon
+    if (popularPlace) {
+        callback(popularPlace.name);
+        return;
     }
-});
-
-// Calculer l'itinéraire
-function calculateRoute() {
-    loadingIndicator.style.display = 'block';
     
-    // Supprimer l'itinéraire précédent
+    // Si ce n'est pas un lieu populaire connu, utiliser le service de géocodage
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}&zoom=18&addressdetails=1&accept-language=fr`;
+    
+    // Utiliser un timeout pour éviter les attentes trop longues
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout')), 5000);
+    });
+    
+    Promise.race([
+        fetch(url, { 
+            headers: { 'User-Agent': 'TaxiMotoJacqueville/1.0' } 
+        }).then(response => response.json()),
+        timeoutPromise
+    ])
+    .then(data => {
+        // Formater l'adresse de manière plus lisible et concise
+        let formattedAddress;
+        if (data && data.display_name) {
+            // Essayer d'extraire les composantes importantes de l'adresse
+            const addr = data.address || {};
+            const components = [];
+            
+            // Construire l'adresse dans un format plus humain
+            if (addr.road) components.push(addr.road);
+            if (addr.neighbourhood) components.push(addr.neighbourhood);
+            if (addr.suburb) components.push(addr.suburb);
+            if (addr.town || addr.city) components.push(addr.town || addr.city);
+            
+            formattedAddress = components.length > 0 ? 
+                components.join(', ') : 
+                data.display_name.split(',').slice(0, 3).join(',');
+        }
+        
+        callback(formattedAddress || "Position actuelle");
+    })
+    .catch(error => {
+        console.warn('Erreur lors du géocodage inversé:', error);
+        // En cas d'erreur, essayer de trouver un lieu populaire à proximité comme solution de secours
+        const nearestPopularPlace = findNearestPopularPlace(coords, 5); // Elargir le rayon à 5km
+        if (nearestPopularPlace) {
+            callback(`Près de ${nearestPopularPlace.name}`);
+        } else {
+            callback("Position actuelle");
+        }
+    });
+}
+
+// Trouver le lieu populaire le plus proche dans un rayon donné (en km)
+function findNearestPopularPlace(coords, maxDistance) {
+    let nearestPlace = null;
+    let minDistance = Infinity;
+    
+    for (const place of popularPlaces) {
+        const distance = calculateHaversineDistance(
+            coords.lat, coords.lng, 
+            place.lat, place.lng
+        );
+        
+        if (distance < maxDistance && distance < minDistance) {
+            minDistance = distance;
+            nearestPlace = place;
+        }
+    }
+    
+    return nearestPlace;
+}
+
+// Fonction de géocodage améliorée (adresse -> coordonnées) avec support des lieux locaux
+function geocode(address, callback) {
+    if (!address || address.trim() === '') {
+        callback([]);
+        return;
+    }
+    
+    // Rechercher d'abord dans notre base de données de lieux populaires
+    const matchingPlaces = popularPlaces.filter(place => 
+        place.name.toLowerCase().includes(address.toLowerCase())
+    );
+    
+    // Si nous avons des correspondances dans nos lieux populaires, les utiliser
+    if (matchingPlaces.length > 0) {
+        const results = matchingPlaces.map(place => ({
+           display_name: place.name,
+            lat: place.lat,
+            lon: place.lng,
+            importance: 0.9,
+            type: "popular",
+            address: {
+                city: place.name.includes("Abidjan") ? "Abidjan" : "",
+                road: ""
+            }
+        }));
+        
+        callback(results);
+        return;
+    }
+    
+    // Si pas de correspondance dans les lieux populaires, utiliser le service de géocodage
+    const encodedAddress = encodeURIComponent(address);
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=5&countrycodes=ci&viewbox=-8.602,4.193,-2.493,10.736&bounded=1&accept-language=fr`;
+    
+    fetch(url, { 
+        headers: { 'User-Agent': 'TaxiMotoJacqueville/1.0' } 
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Filtrer les résultats pour n'avoir que ceux en Côte d'Ivoire
+        const filteredResults = data.filter(result => {
+            const lat = parseFloat(result.lat);
+            const lon = parseFloat(result.lon);
+            
+            return checkIfInIvoryCoast({
+                lat: lat,
+                lng: lon
+            });
+        });
+        
+        callback(filteredResults);
+    })
+    .catch(error => {
+        console.warn('Erreur lors du géocodage:', error);
+        callback([]);
+    });
+}
+
+/**
+ * Utilitaires de distance et de prix
+ */
+
+// Calculer la distance entre deux points avec la formule de Haversine
+function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Rayon de la Terre en km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c; // Distance en km
+    
+    return distance;
+}
+
+// Calculer le prix estimé pour une distance donnée
+function calculatePrice(distance) {
+    // Base de prix pour les trajets courts
+    const basePrice = 500; // FCFA
+    const pricePerKm = 300; // FCFA par kilomètre
+    const minPrice = 500; // Prix minimum
+    
+    // Calcul avec des règles de tarification dégressives pour les longues distances
+    let price;
+    if (distance <= 1) {
+        // Moins d'1km: prix de base
+        price = basePrice;
+    } else if (distance <= 5) {
+        // Entre 1 et 5 km: prix de base + tarif au km
+        price = basePrice + pricePerKm * (distance - 1);
+    } else if (distance <= 10) {
+        // Entre 5 et 10 km: dégressif
+        price = basePrice + pricePerKm * 4 + pricePerKm * 0.9 * (distance - 5);
+    } else {
+        // Plus de 10 km: encore plus dégressif
+        price = basePrice + pricePerKm * 4 + pricePerKm * 0.9 * 5 + pricePerKm * 0.8 * (distance - 10);
+    }
+    
+    // Arrondir au 100 FCFA supérieur
+    price = Math.ceil(price / 100) * 100;
+    
+    // Assurer un prix minimum
+    return Math.max(price, minPrice);
+}
+
+// Convertir les minutes en texte lisible
+function formatDuration(minutes) {
+    if (minutes < 1) {
+        return "moins d'une minute";
+    } else if (minutes === 1) {
+        return "1 minute";
+    } else if (minutes < 60) {
+        return `${Math.round(minutes)} minutes`;
+    } else {
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = Math.round(minutes % 60);
+        
+        if (remainingMinutes === 0) {
+            return hours === 1 ? "1 heure" : `${hours} heures`;
+        } else {
+            return `${hours} heure${hours > 1 ? 's' : ''} ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''}`;
+        }
+    }
+}
+
+/**
+ * Gestion de l'itinéraire
+ */
+
+// Calculer l'itinéraire entre deux points
+function calculateRoute(from, to) {
+    if (!map) return;
+    
+    // Afficher l'indicateur de chargement
+    loadingIndicator.style.display = 'flex';
+    
+    // Si un itinéraire existe déjà, le supprimer
     if (routingControl) {
         map.removeControl(routingControl);
+        routingControl = null;
     }
     
     // Créer un nouvel itinéraire
     routingControl = L.Routing.control({
         waypoints: [
-            L.latLng(routeData.pickupCoords.lat, routeData.pickupCoords.lng),
-            L.latLng(routeData.destinationCoords.lat, routeData.destinationCoords.lng)
+            L.latLng(from.lat, from.lng),
+            L.latLng(to.lat, to.lng)
         ],
+        router: L.Routing.osrmv1({
+            serviceUrl: 'https://router.project-osrm.org/route/v1',
+            profile: 'driving', // Utiliser le profil 'driving' qui est plus adapté aux motos
+            useHints: false // Désactiver les suggestions pour éviter les problèmes
+        }),
+        lineOptions: {
+            styles: [
+                {color: '#3388ff', opacity: 0.8, weight: 6},
+                {color: '#ffffff', opacity: 0.5, weight: 4}
+            ]
+        },
+        addWaypoints: false,
+        draggableWaypoints: false,
         routeWhileDragging: false,
         showAlternatives: false,
-        createMarker: function() { return null; }
+        createMarker: function() { return null; } // Désactiver les marqueurs de Leaflet.Routing
     }).addTo(map);
     
-    // Écouter l'événement de route trouvée
+    // Ajouter des marqueurs personnalisés pour le départ et l'arrivée
+    addCustomRouteMarkers(from, to);
+    
+    // Écouter l'événement de calcul d'itinéraire
     routingControl.on('routesfound', function(e) {
-        const routes = e.routes;
-        const route = routes[0];
+        // Cacher l'indicateur de chargement
+        loadingIndicator.style.display = 'none';
         
-        // Calculer la distance en kilomètres (arrondie à 2 décimales)
-        const distanceInKm = (route.summary.totalDistance / 1000).toFixed(2);
+        const routes = e.routes;
+        const route = routes[0]; // Utiliser le premier itinéraire
+        
+        // Calculer la distance en kilomètres (arrondie à 1 décimale)
+        const distanceInKm = Math.round(route.summary.totalDistance / 100) / 10;
         
         // Calculer la durée en minutes (arrondie à la minute près)
         const durationInMinutes = Math.round(route.summary.totalTime / 60);
         
-        // Calculer le prix (100 FCFA par kilomètre + frais fixes de 500 FCFA)
-        const basePrice = 500;
-        const pricePerKm = 100;
-        const price = basePrice + Math.round(distanceInKm * pricePerKm);
+        // Calculer le prix
+        const price = calculatePrice(distanceInKm);
         
         // Mettre à jour les données de l'itinéraire
         routeData.distance = distanceInKm;
         routeData.duration = durationInMinutes;
         routeData.price = price;
         
-        // Afficher les détails de l'itinéraire
-        distanceElement.textContent = distanceInKm + ' km';
-        durationElement.textContent = durationInMinutes + ' min';
-        priceElement.textContent = price + ' FCFA';
+        // Mettre à jour l'affichage
+        distanceElement.textContent = `${distanceInKm} km`;
+        durationElement.textContent = formatDuration(durationInMinutes);
+        priceElement.textContent = `${price} FCFA`;
         
+        // Afficher les détails du trajet
         journeyDetails.style.display = 'block';
         confirmOrderBtn.style.display = 'block';
-        searchRouteBtn.style.display = 'none';
-        loadingIndicator.style.display = 'none';
+        
+        // Centrer la carte pour montrer l'ensemble de l'itinéraire
+        map.fitBounds(L.latLngBounds(
+            [from.lat, from.lng],
+            [to.lat, to.lng]
+        ).pad(0.3));
     });
     
+    // Gérer les erreurs de calcul d'itinéraire
     routingControl.on('routingerror', function(e) {
+        console.error('Erreur de calcul d\'itinéraire:', e.error);
         loadingIndicator.style.display = 'none';
-        alert('Impossible de trouver un itinéraire entre ces deux points. Veuillez vérifier vos adresses.');
+        showTemporaryMessage("Impossible de calculer cet itinéraire. Veuillez essayer avec d'autres adresses.", 4000);
     });
 }
 
-// Confirmer la commande
-confirmOrderBtn.addEventListener('click', () => {
-    // Vérifier que l'itinéraire a été calculé
-    if (routeData.distance > 0 && routeData.price > 0) {
-        // Afficher le modal de confirmation
-        modalDistance.textContent = routeData.distance + ' km';
-        modalPrice.textContent = routeData.price + ' FCFA';
-        confirmationModal.style.display = 'block';
+// Ajouter des marqueurs personnalisés pour le départ et l'arrivée
+function addCustomRouteMarkers(from, to) {
+    // Supprimer les marqueurs existants s'il y en a
+    if (window.pickupMarker) window.pickupMarker.remove();
+    if (window.destinationMarker) window.destinationMarker.remove();
+    
+    // Icône pour le point de départ (vert)
+    const pickupIcon = L.divIcon({
+        html: '<div style="background-color: #4CAF50; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 3px rgba(0,0,0,0.4);"></div>',
+        className: 'pickup-marker-icon',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+    });
+    
+    // Icône pour la destination (rouge)
+    const destinationIcon = L.divIcon({
+        html: '<div style="background-color: #F44336; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 3px rgba(0,0,0,0.4);"></div>',
+        className: 'destination-marker-icon',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+    });
+    
+    // Ajouter les marqueurs à la carte
+    window.pickupMarker = L.marker([from.lat, from.lng], {
+        icon: pickupIcon,
+        zIndexOffset: 1000
+    }).addTo(map);
+    
+    window.destinationMarker = L.marker([to.lat, to.lng], {
+        icon: destinationIcon,
+        zIndexOffset: 1000
+    }).addTo(map);
+}
+
+/**
+ * Interface utilisateur et événements
+ */
+
+// Fonction pour afficher un message temporaire
+function showTemporaryMessage(message, duration = 3000) {
+    const messageContainer = document.createElement('div');
+    messageContainer.classList.add('temporary-message');
+    messageContainer.textContent = message;
+    
+    document.body.appendChild(messageContainer);
+    
+    // Animation d'entrée
+    setTimeout(() => {
+        messageContainer.classList.add('show');
+    }, 10);
+    
+    // Animation de sortie et suppression
+    setTimeout(() => {
+        messageContainer.classList.remove('show');
+        messageContainer.classList.add('hide');
+        
+        setTimeout(() => {
+            document.body.removeChild(messageContainer);
+        }, 300);
+    }, duration);
+}
+
+// Navigation mobile
+hamburger.addEventListener('click', () => {
+    mobileNav.classList.toggle('open');
+    navOverlay.classList.toggle('show');
+    document.body.classList.toggle('no-scroll');
+});
+
+navOverlay.addEventListener('click', () => {
+    mobileNav.classList.remove('open');
+    navOverlay.classList.remove('show');
+    document.body.classList.remove('no-scroll');
+});
+
+// Gestion de la recherche d'itinéraire
+pickupInput.addEventListener('input', function() {
+    const query = this.value.trim();
+    
+    if (query.length >= 2) {
+        // Effectuer la recherche et afficher les suggestions
+        geocode(query, results => {
+            pickupResults.innerHTML = '';
+            
+            if (results.length === 0) {
+                pickupResults.style.display = 'none';
+                return;
+            }
+            
+            results.forEach(result => {
+                const item = document.createElement('div');
+                item.classList.add('search-result-item');
+                
+                // Simplifier le nom affiché
+                let displayName = result.display_name;
+                if (!result.type || result.type !== "popular") {
+                    // Pour les résultats Nominatim, simplifier le nom d'affichage
+                    const parts = displayName.split(',');
+                    if (parts.length > 3) {
+                        displayName = parts.slice(0, 3).join(',');
+                    }
+                }
+                
+                item.textContent = displayName;
+                
+                item.addEventListener('click', () => {
+                    pickupInput.value = displayName;
+                    routeData.pickup = displayName;
+                    routeData.pickupCoords = {
+                        lat: parseFloat(result.lat),
+                        lng: parseFloat(result.lon)
+                    };
+                    pickupResults.style.display = 'none';
+                });
+                
+                pickupResults.appendChild(item);
+            });
+            
+            pickupResults.style.display = 'block';
+        });
     } else {
-        alert('Veuillez d\'abord rechercher un itinéraire');
+        pickupResults.style.display = 'none';
     }
 });
 
-// Annuler la commande
+destinationInput.addEventListener('input', function() {
+    const query = this.value.trim();
+    
+    if (query.length >= 2) {
+        // Effectuer la recherche et afficher les suggestions
+        geocode(query, results => {
+            destinationResults.innerHTML = '';
+            
+            if (results.length === 0) {
+                destinationResults.style.display = 'none';
+                return;
+            }
+            
+            results.forEach(result => {
+                const item = document.createElement('div');
+                item.classList.add('search-result-item');
+                
+                // Simplifier le nom affiché
+                let displayName = result.display_name;
+                if (!result.type || result.type !== "popular") {
+                    // Pour les résultats Nominatim, simplifier le nom d'affichage
+                    const parts = displayName.split(',');
+                    if (parts.length > 3) {
+                        displayName = parts.slice(0, 3).join(',');
+                    }
+                }
+                
+                item.textContent = displayName;
+                
+                item.addEventListener('click', () => {
+                    destinationInput.value = displayName;
+                    routeData.destination = displayName;
+                    routeData.destinationCoords = {
+                        lat: parseFloat(result.lat),
+                        lng: parseFloat(result.lon)
+                    };
+                    destinationResults.style.display = 'none';
+                });
+                
+                destinationResults.appendChild(item);
+            });
+            
+            destinationResults.style.display = 'block';
+        });
+    } else {
+        destinationResults.style.display = 'none';
+    }
+});
+
+// Masquer les résultats de recherche lorsqu'on clique ailleurs
+document.addEventListener('click', function(e) {
+    if (!pickupInput.contains(e.target) && !pickupResults.contains(e.target)) {
+        pickupResults.style.display = 'none';
+    }
+    
+    if (!destinationInput.contains(e.target) && !destinationResults.contains(e.target)) {
+        destinationResults.style.display = 'none';
+    }
+});
+
+// Rechercher un itinéraire
+searchRouteBtn.addEventListener('click', () => {
+    const pickup = pickupInput.value.trim();
+    const destination = destinationInput.value.trim();
+    
+    if (!pickup || !destination) {
+        showTemporaryMessage('Veuillez entrer un point de départ et une destination');
+        return;
+    }
+    
+    // Si les coordonnées sont déjà définies, calculer l'itinéraire directement
+    if (routeData.pickupCoords && routeData.pickupCoords.lat && 
+        routeData.destinationCoords && routeData.destinationCoords.lat) {
+        calculateRoute(routeData.pickupCoords, routeData.destinationCoords);
+        return;
+    }
+    
+    // Sinon, géocoder les adresses
+    showTemporaryMessage('Recherche de l\'itinéraire...');
+    
+    // Géocoder le point de départ si nécessaire
+    if (!routeData.pickupCoords || !routeData.pickupCoords.lat) {
+        geocode(pickup, pickupResults => {
+            if (pickupResults.length === 0) {
+                showTemporaryMessage('Point de départ introuvable');
+                return;
+            }
+            
+            routeData.pickupCoords = {
+                lat: parseFloat(pickupResults[0].lat),
+                lng: parseFloat(pickupResults[0].lon)
+            };
+            
+            // Géocoder la destination si nécessaire
+            if (!routeData.destinationCoords || !routeData.destinationCoords.lat) {
+                geocode(destination, destResults => {
+                    if (destResults.length === 0) {
+                        showTemporaryMessage('Destination introuvable');
+                        return;
+                    }
+                    
+                    routeData.destinationCoords = {
+                        lat: parseFloat(destResults[0].lat),
+                        lng: parseFloat(destResults[0].lon)
+                    };
+                    
+                    // Calculer l'itinéraire
+                    calculateRoute(routeData.pickupCoords, routeData.destinationCoords);
+                });
+            } else {
+                calculateRoute(routeData.pickupCoords, routeData.destinationCoords);
+            }
+        });
+    } else if (!routeData.destinationCoords || !routeData.destinationCoords.lat) {
+        // Géocoder seulement la destination
+        geocode(destination, destResults => {
+            if (destResults.length === 0) {
+                showTemporaryMessage('Destination introuvable');
+                return;
+            }
+            
+            routeData.destinationCoords = {
+                lat: parseFloat(destResults[0].lat),
+                lng: parseFloat(destResults[0].lon)
+            };
+            
+            // Calculer l'itinéraire
+            calculateRoute(routeData.pickupCoords, routeData.destinationCoords);
+        });
+    } else {
+        // Les deux coordonnées sont disponibles
+        calculateRoute(routeData.pickupCoords, routeData.destinationCoords);
+    }
+});
+
+// Confirmer une commande
+confirmOrderBtn.addEventListener('click', () => {
+    modalDistance.textContent = distanceElement.textContent;
+    modalPrice.textContent = priceElement.textContent;
+    confirmationModal.style.display = 'flex';
+});
+
+// Annuler une commande
 cancelOrderBtn.addEventListener('click', () => {
     confirmationModal.style.display = 'none';
 });
 
-// Confirmation finale de la commande
+// Confirmer définitivement une commande
 finalConfirmBtn.addEventListener('click', () => {
-    confirmationModal.style.display = 'none';
+    // Désactiver le bouton pour éviter les clics multiples
+    finalConfirmBtn.disabled = true;
+    finalConfirmBtn.textContent = 'Commande en cours...';
     
-    // Créer une nouvelle commande dans la base de données
-    const userId = localStorage.getItem('taxiMotoUserId');
-    if (!userId) {
-        alert('Votre session a expiré. Veuillez vous reconnecter.');
-        showRegistrationModal();
-        return;
-    }
-    
+    // Créer une nouvelle commande dans Firebase
     const newOrderRef = database.ref('orders').push();
-    const orderData = {
-        userId: userId,
-        userName: userInfo.firstName + ' ' + userInfo.lastName,
-        userPhone: userInfo.phone,
+    const order = {
+        userId: localStorage.getItem('taxiMotoUserId'),
+        userName: userInfo ? userInfo.firstName + ' ' + userInfo.lastName : 'Utilisateur',
+        userPhone: userInfo ? userInfo.phone : '',
         pickup: routeData.pickup,
         destination: routeData.destination,
         pickupCoords: routeData.pickupCoords,
@@ -1367,67 +2078,97 @@ finalConfirmBtn.addEventListener('click', () => {
         distance: routeData.distance,
         duration: routeData.duration,
         price: routeData.price,
-        status: 'pending', // pending, accepted, completed, cancelled
-        createdAt: firebase.database.ServerValue.TIMESTAMP
+        status: 'pending', // En attente d'un chauffeur
+        timestamp: firebase.database.ServerValue.TIMESTAMP
     };
     
-    newOrderRef.set(orderData)
+    newOrderRef.set(order)
         .then(() => {
-            currentOrderId = newOrderRef.key;
-            alert('Votre commande a été enregistrée. Nous recherchons un chauffeur disponible...');
+            // Fermer le modal de confirmation
+            confirmationModal.style.display = 'none';
             
-            // Écouter les modifications de la commande (pour savoir quand un chauffeur accepte)
-            listenForDriverAssignment(currentOrderId);
+            // Enregistrer l'ID de la commande en cours
+            currentOrderId = newOrderRef.key;
+            
+            // Afficher un message de succès
+            showTemporaryMessage('Commande enregistrée! Recherche d\'un chauffeur...', 5000);
+            
+            // Commencer à surveiller l'affectation d'un chauffeur
+            watchDriverAssignment(currentOrderId);
         })
-        .catch((error) => {
-            console.error("Erreur lors de l'enregistrement de la commande:", error);
-            alert('Une erreur est survenue. Veuillez réessayer.');
+        .catch(error => {
+            console.error('Erreur lors de la création de la commande:', error);
+            finalConfirmBtn.disabled = false;
+            finalConfirmBtn.textContent = 'Confirmer';
+            showTemporaryMessage('Erreur lors de la création de la commande. Veuillez réessayer.');
         });
 });
 
-// Écouter l'attribution d'un chauffeur
-function listenForDriverAssignment(orderId) {
+// Surveiller l'affectation d'un chauffeur
+function watchDriverAssignment(orderId) {
     const orderRef = database.ref('orders/' + orderId);
-    orderRef.on('value', (snapshot) => {
+    
+    // Écouter les changements de la commande
+    orderRef.on('value', snapshot => {
         const orderData = snapshot.val();
-        if (orderData && orderData.status === 'accepted' && orderData.driverId) {
-            // Récupérer les informations du chauffeur
-            database.ref('drivers/' + orderData.driverId).once('value')
-                .then((driverSnapshot) => {
-                    if (driverSnapshot.exists()) {
-                        const driverData = driverSnapshot.val();
-                        displayDriverInfo(driverData);
-                    }
-                })
-                .catch((error) => {
-                    console.error("Erreur lors de la récupération des informations du chauffeur:", error);
-                });
+        
+        if (orderData && orderData.driver) {
+            // Un chauffeur a été assigné
+            // Afficher le modal avec les informations du chauffeur
+            driverName.textContent = orderData.driver.name || 'Chauffeur';
+            driverPhone.textContent = orderData.driver.phone || 'N/A';
+            driverPlate.textContent = orderData.driver.plate || 'N/A';
+            driverAssignedModal.style.display = 'flex';
+            
+            // Arrêter d'écouter les changements
+            orderRef.off('value');
         }
     });
+    
+    // Arrêter l'écoute après 5 minutes pour éviter les problèmes
+    setTimeout(() => {
+        orderRef.off('value');
+    }, 5 * 60 * 1000);
 }
 
-// Afficher les informations du chauffeur
-function displayDriverInfo(driver) {
-    driverName.textContent = driver.firstName + ' ' + driver.lastName;
-    driverPhone.textContent = driver.phone;
-    driverPlate.textContent = driver.plateNumber || 'N/A';
-    driverAssignedModal.style.display = 'block';
-}
-
-// Fermer le modal du chauffeur
+// Fermer le modal de chauffeur assigné
 acknowledgeDriverBtn.addEventListener('click', () => {
     driverAssignedModal.style.display = 'none';
 });
 
-// Gérer le menu mobile
-hamburger.addEventListener('click', () => {
-    mobileNav.classList.toggle('active');
-    navOverlay.classList.toggle('active');
+// Masquer les résultats quand on clique ailleurs
+document.addEventListener('click', (e) => {
+    if (!pickupInput.contains(e.target) && !pickupResults.contains(e.target)) {
+        pickupResults.style.display = 'none';
+    }
+    
+    if (!destinationInput.contains(e.target) && !destinationResults.contains(e.target)) {
+        destinationResults.style.display = 'none';
+    }
 });
 
-navOverlay.addEventListener('click', () => {
-    mobileNav.classList.remove('active');
-    navOverlay.classList.remove('active');
+// Écouteur d'événement pour entrée clavier sur les champs de recherche
+pickupInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        pickupResults.style.display = 'none';
+        destinationInput.focus();
+    }
+});
+
+destinationInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        destinationResults.style.display = 'none';
+        searchRouteBtn.click();
+    }
+});
+
+// Détecter la connexion réseau
+window.addEventListener('online', () => {
+    showTemporaryMessage('Vous êtes connecté au réseau', 2000);
+});
+
+window.addEventListener('offline', () => {
+    showTemporaryMessage('Vous êtes hors ligne. Certaines fonctionnalités peuvent être limitées.', 5000);
 });
 
 // Initialiser l'application
