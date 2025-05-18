@@ -62,10 +62,23 @@
             background: #43a047; color: #fff; border:none; border-radius: 8px; padding: 13px 24px;
             font-size: 18px; font-weight: bold; margin: 18px 0 0 18px; cursor: pointer;
         }
+        #finishRideBtn {
+            background: #1976d2; color: #fff;
+            border:none; border-radius: 8px; padding: 13px 24px;
+            font-size: 18px; font-weight: bold; margin: 18px 0 0 18px; cursor: pointer;
+            display: none;
+        }
         #notificationBanner {
             position: fixed; top: 20px; left:50%; transform: translateX(-50%);
             background: #f44336; color: #fff; padding: 12px 30px; border-radius: 8px;
             z-index: 4000; font-size: 18px; display: none;
+        }
+        #backToOrdersBtn {
+            background: #1976d2; color: #fff;
+            border:none; border-radius: 8px; padding: 13px 24px;
+            font-size: 18px; font-weight: bold; margin: 24px auto 0 auto; cursor: pointer;
+            display: none;
+            width: fit-content;
         }
         @media (max-width: 600px) {
             .driver-modal-content { min-width: unset; width: 96vw; padding: 18px 5vw; }
@@ -74,7 +87,7 @@
             #rideMapHeader {padding: 12px 6px 8px 6px; font-size: 0.95em;}
             #rideMapHeader .row {flex-direction: column; gap: 4px;}
             #rideMap {min-height: 220px;}
-            #mapStartBtn {font-size: 1em; padding: 10px 14px; margin: 10px 0 0 8px;}
+            #mapStartBtn, #finishRideBtn, #backToOrdersBtn {font-size: 1em; padding: 10px 14px; margin: 10px 0 0 8px;}
             #notificationBanner {font-size: 1em; padding: 8px 8vw;}
         }
     </style>
@@ -107,8 +120,10 @@
             <div><i class="fas fa-money-bill-wave"></i> <b id="fareDisplay"></b></div>
         </div>
         <button id="mapStartBtn" style="display:none;">Démarrer</button>
+        <button id="finishRideBtn" style="display:none;">Finir la course</button>
     </div>
     <div id="rideMap"></div>
+    <button id="backToOrdersBtn" style="display:none;">Retour à la liste des commandes</button>
 </div>
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -139,6 +154,9 @@ let currentPos = null;
 let watchId = null;
 let isStarted = false;
 let clientLocation = null, destinationLocation = null;
+
+// Pour éviter les doublons de listeners commandes
+let ordersListListener = null;
 
 // Notif util
 function showBanner(msg, color="#f44336", duration=3500) {
@@ -191,9 +209,18 @@ function setupDriverRegisterForm() {
 // --------- LISTE COMMANDES DISPONIBLES --------
 function loadOrdersList() {
     document.getElementById('ordersList').style.display = "block";
+    document.getElementById('rideMapContainer').style.display = "none";
     const ordersContainer = document.getElementById('ordersContainer');
     ordersContainer.innerHTML = '<div>Chargement...</div>';
-    db.ref("orders").orderByChild("status").equalTo("pending").on('value', snap=>{
+
+    // Détacher l'ancien listener s'il existe pour éviter les doublons
+    if (ordersListListener) {
+        db.ref("orders").orderByChild("status").equalTo("pending").off('value', ordersListListener);
+        ordersListListener = null;
+    }
+
+    // Nouveau listener
+    ordersListListener = function(snap) {
         ordersContainer.innerHTML = "";
         const orders = snap.val() || {};
         let any = false;
@@ -213,7 +240,9 @@ function loadOrdersList() {
             ordersContainer.appendChild(card);
         });
         if(!any) ordersContainer.innerHTML = "<div>Aucune commande disponible.</div>";
-    });
+    };
+
+    db.ref("orders").orderByChild("status").equalTo("pending").on('value', ordersListListener);
 }
 
 // --------- ACCEPTATION D'UNE COURSE ---------
@@ -266,6 +295,8 @@ function showRideMap(orderId, order) {
     document.getElementById('destDisplay').textContent = order.destination || "?";
     document.getElementById('fareDisplay').textContent = order.price ? `${order.price} FCFA` : "?";
     document.getElementById('mapStartBtn').style.display = "inline-block";
+    document.getElementById('finishRideBtn').style.display = "none";
+    document.getElementById('backToOrdersBtn').style.display = "none";
     isStarted = false;
 
     // Initialiser la carte
@@ -318,6 +349,7 @@ function showRideMap(orderId, order) {
     document.getElementById('mapStartBtn').onclick = ()=>{
         isStarted = true;
         document.getElementById('mapStartBtn').style.display = "none";
+        document.getElementById('finishRideBtn').style.display = "inline-block";
         if(routingControl) rideMap.removeControl(routingControl);
         routingControl = L.Routing.control({
             waypoints: [
@@ -334,6 +366,25 @@ function showRideMap(orderId, order) {
         ]);
     };
 
+    // Ajout bouton de fin de course
+    document.getElementById('finishRideBtn').onclick = function() {
+        // Mettre à jour le statut de la commande à "finished"
+        db.ref("orders/" + orderId).update({ status: "finished", finishedAt: firebase.database.ServerValue.TIMESTAMP })
+        .then(()=>{
+            showBanner("Course terminée !", "#43a047", 3500);
+            document.getElementById('finishRideBtn').style.display = "none";
+            document.getElementById('backToOrdersBtn').style.display = "inline-block";
+        })
+        .catch(()=>{
+            showBanner("Erreur lors de la finalisation.", "#f44336", 3500);
+        });
+    };
+
+    // Bouton retour à la liste des commandes
+    document.getElementById('backToOrdersBtn').onclick = function() {
+        loadOrdersList();
+    };
+
     // Notification annulation
     db.ref("orders/"+orderId).on('value', snap=>{
         const val = snap.val();
@@ -341,6 +392,11 @@ function showRideMap(orderId, order) {
         if(val.status==="cancelled") {
             showBanner("La commande a été annulée par le client.", "#f44336", 7000);
             setTimeout(()=>window.location.reload(), 1500);
+        }
+        // Afficher bouton retour si la course est terminée (par exemple par le client aussi)
+        if(val.status==="finished" && document.getElementById('backToOrdersBtn').style.display==="none") {
+            document.getElementById('finishRideBtn').style.display = "none";
+            document.getElementById('backToOrdersBtn').style.display = "inline-block";
         }
     });
 }
