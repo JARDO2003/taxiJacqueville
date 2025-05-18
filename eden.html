@@ -567,12 +567,8 @@
                     successMessage.style.display = "block";
                     errorMessage.style.display = "none";
                     orderForm.reset();
-                    
-                    // Rediriger vers la page marcio.html après 3 secondes
-                    setTimeout(() => {
-                        window.location.href = "index.html";
-                    }, 3000);
-                })
+                    })
+                 
                 .catch((error) => {
                     // Afficher le message d'erreur
                     errorMessage.style.display = "block";
