@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -841,7 +840,7 @@
             <h2 class="section-title">Autres services</h2>
             <div class="services-container">
                 <div class="service-card">
-                    <div class="service-image" style="background-image: url('/api/placeholder/400/200');">
+                    <div class="service-image" style="background-image: url('image/opo.png');">
                         <div class="service-overlay">
                             <h3>Eden Livraison</h3>
                             <p>Service de livraison rapide et fiable</p>
@@ -882,6 +881,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <!-- Leaflet Routing Machine -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
+
 <script>
 // Configuration Firebase
 const firebaseConfig = {
@@ -2174,6 +2174,255 @@ window.addEventListener('offline', () => {
 // Initialiser l'application
 document.addEventListener('DOMContentLoaded', () => {
     checkUserRegistration();
+});
+</script>
+
+<script>
+    // Variables globales
+let activeOrderPanel = document.createElement('div');
+let isOrderActive = false;
+
+// Afficher le panneau de commande active avec bouton d'annulation
+function showActiveOrderPanel(orderId, driverPhoneNumber = '') {
+    // Créer ou mettre à jour le panneau de commande active
+    if (!document.body.contains(activeOrderPanel)) {
+        activeOrderPanel = document.createElement('div');
+        activeOrderPanel.id = 'activeOrderPanel';
+        activeOrderPanel.classList.add('active-order-panel');
+        document.body.appendChild(activeOrderPanel);
+    }
+
+    // Mettre à jour le contenu du panneau
+    activeOrderPanel.innerHTML = `
+        <div class="active-order-content">
+            <div class="active-order-header">
+                <h3>Commande en cours</h3>
+                <p>Destination: <span id="activeOrderDestination">${routeData.destination || 'Non spécifié'}</span></p>
+            </div>
+            <div class="active-order-driver" id="activeOrderDriverInfo"></div>
+            <button id="cancelActiveOrderBtn" class="cancel-order-btn">Annuler la commande</button>
+        </div>
+    `;
+
+    // Ajouter le style si pas encore fait
+    if (!document.getElementById('activeOrderPanelStyle')) {
+        const style = document.createElement('style');
+        style.id = 'activeOrderPanelStyle';
+        style.textContent = `
+            .active-order-panel {
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 90%;
+                max-width: 400px;
+                background-color: white;
+                border-radius: 10px;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+                z-index: 1001;
+                overflow: hidden;
+                transition: all 0.3s ease;
+            }
+            .active-order-content { padding: 15px; }
+            .active-order-header { margin-bottom: 15px; }
+            .active-order-header h3 { margin: 0 0 8px 0; color: #333; }
+            .active-order-header p { margin: 0; font-size: 14px; color: #666; }
+            .cancel-order-btn {
+                width: 100%;
+                padding: 12px;
+                background-color: #ff5252;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }
+            .cancel-order-btn:hover { background-color: #ff1a1a; }
+            .driver-info-section {
+                background: #f7f7f7;
+                border-radius: 7px;
+                margin: 10px 0 15px 0;
+                padding: 10px;
+                font-size: 14px;
+            }
+            .driver-info-section strong { color: #333; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Ajouter l'événement d'annulation
+    document.getElementById('cancelActiveOrderBtn').addEventListener('click', () => {
+        // Si numéro du chauffeur disponible, ouvrir l'application téléphone avec ce numéro
+        if (driverPhoneNumber && typeof driverPhoneNumber === 'string') {
+            window.location.href = `tel:${driverPhoneNumber}`;
+        } else if (
+            window.currentDriverPhoneNumber &&
+            typeof window.currentDriverPhoneNumber === 'string'
+        ) {
+            window.location.href = `tel:${window.currentDriverPhoneNumber}`;
+        } else {
+            showTemporaryMessage('Numéro du chauffeur indisponible.', 3000);
+        }
+        // Annuler la commande côté base de données
+        cancelOrder(orderId);
+    });
+
+    // Afficher le panneau
+    activeOrderPanel.style.display = 'block';
+    isOrderActive = true;
+}
+
+// Fonction pour masquer le panneau de commande active
+function hideActiveOrderPanel() {
+    if (activeOrderPanel) {
+        activeOrderPanel.style.display = 'none';
+        isOrderActive = false;
+    }
+}
+
+// Fonction pour annuler une commande
+function cancelOrder(orderId) {
+    if (!orderId) {
+        showTemporaryMessage('Impossible d\'annuler: aucune commande active');
+        return;
+    }
+    // Référence à la commande dans Firebase
+    const orderRef = database.ref('orders/' + orderId);
+
+    // Mettre à jour le statut de la commande
+    orderRef.update({
+        status: 'cancelled',
+        cancelledAt: firebase.database.ServerValue.TIMESTAMP,
+        cancelledBy: 'client'
+    })
+    .then(() => {
+        showTemporaryMessage('Commande annulée avec succès', 3000);
+        hideActiveOrderPanel();
+        currentOrderId = null;
+
+        // Nettoyer l'itinéraire si affiché
+        if (routingControl) {
+            map.removeControl(routingControl);
+            routingControl = null;
+        }
+        // Supprimer les marqueurs d'itinéraire
+        if (window.pickupMarker) window.pickupMarker.remove();
+        if (window.destinationMarker) window.destinationMarker.remove();
+
+        // Réinitialiser les champs pour permettre une nouvelle commande
+        journeyDetails.style.display = 'none';
+        confirmOrderBtn.style.display = 'none';
+    })
+    .catch(error => {
+        console.error('Erreur lors de l\'annulation de la commande:', error);
+        showTemporaryMessage('Erreur lors de l\'annulation. Veuillez réessayer.', 3000);
+    });
+}
+
+// Fonction de confirmation finale de la commande
+finalConfirmBtn.addEventListener('click', () => {
+    // Désactiver le bouton pour éviter les clics multiples
+    finalConfirmBtn.disabled = true;
+    finalConfirmBtn.textContent = 'Commande en cours...';
+
+    // Créer une nouvelle commande dans Firebase
+    const newOrderRef = database.ref('orders').push();
+    const order = {
+        userId: localStorage.getItem('taxiMotoUserId'),
+        userName: userInfo ? userInfo.firstName + ' ' + userInfo.lastName : 'Utilisateur',
+        userPhone: userInfo ? userInfo.phone : '',
+        pickup: routeData.pickup,
+        destination: routeData.destination,
+        pickupCoords: routeData.pickupCoords,
+        destinationCoords: routeData.destinationCoords,
+        distance: routeData.distance,
+        duration: routeData.duration,
+        price: routeData.price,
+        status: 'pending', // En attente d'un chauffeur
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+    };
+
+    newOrderRef.set(order)
+        .then(() => {
+            // Fermer le modal de confirmation
+            confirmationModal.style.display = 'none';
+            // Enregistrer l'ID de la commande en cours
+            currentOrderId = newOrderRef.key;
+            // Afficher un message de succès
+            showTemporaryMessage('Commande enregistrée! Recherche d\'un chauffeur...', 5000);
+            // Commencer à surveiller l'affectation d'un chauffeur
+            watchDriverAssignment(currentOrderId);
+            // Afficher le panneau de commande active
+            showActiveOrderPanel(currentOrderId);
+        })
+        .catch(error => {
+            console.error('Erreur lors de la création de la commande:', error);
+            finalConfirmBtn.disabled = false;
+            finalConfirmBtn.textContent = 'Confirmer';
+            showTemporaryMessage('Erreur lors de la création de la commande. Veuillez réessayer.');
+        });
+});
+
+// Surveiller l'affectation du chauffeur et mettre à jour le panneau si besoin
+function watchDriverAssignment(orderId) {
+    const orderRef = database.ref('orders/' + orderId);
+
+    // Écouter les changements de la commande
+    orderRef.on('value', snapshot => {
+        const orderData = snapshot.val();
+
+        if (!orderData) {
+            // La commande n'existe plus
+            hideActiveOrderPanel();
+            return;
+        }
+
+        // Vérifier si la commande est annulée
+        if (orderData.status === 'cancelled') {
+            hideActiveOrderPanel();
+            // Si annulée par le fournisseur, informer le client
+            if (orderData.cancelledBy === 'driver') {
+                showTemporaryMessage('Votre commande a été annulée par le chauffeur', 5000);
+            }
+            // Arrêter d'écouter les changements
+            orderRef.off('value');
+            return;
+        }
+
+        // Si un chauffeur est assigné, afficher ses infos et mémoriser le numéro
+        if (orderData && orderData.driver) {
+            const driverInfoHTML = `
+                <div class="driver-info-section">
+                    <p><strong>Chauffeur:</strong> ${orderData.driver.name || 'N/A'}</p>
+                    <p><strong>Numéro:</strong> <span id="driverPhoneSpan">${orderData.driver.phone || 'N/A'}</span></p>
+                    <p><strong>Plaque:</strong> ${orderData.driver.plate || 'N/A'}</p>
+                </div>
+            `;
+            const driverInfoContainer = document.getElementById('activeOrderDriverInfo');
+            if (driverInfoContainer) {
+                driverInfoContainer.innerHTML = driverInfoHTML;
+            }
+            // Stocker le numéro pour l'utiliser lors de l'annulation
+            window.currentDriverPhoneNumber = orderData.driver.phone || '';
+        }
+    });
+
+    // Arrêter l'écoute après 30 minutes pour éviter les problèmes de mémoire
+    setTimeout(() => {
+        orderRef.off('value');
+    }, 30 * 60 * 1000);
+}
+
+// Quand l'utilisateur reconnaît le chauffeur, masquer le modal et afficher le panneau actif
+acknowledgeDriverBtn.addEventListener('click', () => {
+    driverAssignedModal.style.display = 'none';
+    // S'assurer que le panneau de commande active est toujours visible
+    if (currentOrderId && !isOrderActive) {
+        // Prendre le numéro du chauffeur si possible
+        const driverPhone = window.currentDriverPhoneNumber || '';
+        showActiveOrderPanel(currentOrderId, driverPhone);
+    }
 });
 </script>
 </body>
